@@ -18,12 +18,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway" # Allow access to host services if needed
     networks:
-      - tashonduras_net
+      - cloudflare_default
 
 networks:
-  tashonduras_net:
+  cloudflare_default:
     external: true
-    # Assuming there is an external network where cloudflare tunnel lives.
-    # If not, remove external: true and let it create default.
-    # User mentioned "flota.tashonduras.com" uses docker-compose, likely they share a network 
-    # or just expose ports. For safety, let's expose port 3000 locally so tunnel works effortlessly.
+    name: cloudflare_default
