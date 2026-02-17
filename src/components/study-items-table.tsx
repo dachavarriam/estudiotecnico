@@ -28,11 +28,13 @@ interface StudyItemsTableProps {
   items: StudyItem[];
   setItems: (items: StudyItem[]) => void;
   images: SiteImage[];
+  readOnly?: boolean;
 }
 
-export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProps) {
+export function StudyItemsTable({ items, setItems, images, readOnly = false }: StudyItemsTableProps) {
   const [focusedRow, setFocusedRow] = useState<number | null>(null);
   
+  // ... (rest of search logic) ...
   // Autocomplete State
   const [suggestions, setSuggestions] = useState<SupplyItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -51,6 +53,7 @@ export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProp
   };
 
   const handleInputChange = (index: number, field: keyof StudyItem, value: any) => {
+    if (readOnly) return;
     const newItems = [...items];
     (newItems[index] as any)[field] = value;
     
@@ -88,11 +91,13 @@ export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProp
   };
   
   const handleItemFocus = (index: number) => {
+      if (readOnly) return;
       const currentVal = items[index].item;
       triggerSearch(index, currentVal); 
   };
 
   const selectProduct = (index: number, product: SupplyItem) => {
+      if (readOnly) return;
       const newItems = [...items];
       newItems[index].item = product.name;
       newItems[index].odoo_product_id = product.id;
@@ -106,6 +111,7 @@ export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProp
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number, field: string) => {
+    if (readOnly) return;
     if (e.key === "Enter") {
         e.preventDefault();
         if (field === "category") document.getElementById(`input-${index}-item`)?.focus();
@@ -124,11 +130,12 @@ export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProp
   };
 
   const addNewRow = () => {
+    if (readOnly) return;
     setItems([...items, { item: "", quantity: 1, unit: "und", category: "supply" }]);
-     // Scroll to bottom logic if needed
   };
 
   const removeRow = (index: number) => {
+    if (readOnly) return;
     setItems(items.filter((_, i) => i !== index));
   };
   
@@ -172,8 +179,9 @@ export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProp
                     <Select 
                         value={item.category} 
                         onValueChange={(val: any) => handleInputChange(i, "category", val)}
+                        disabled={readOnly}
                     >
-                        <SelectTrigger className="h-9 w-full bg-transparent border-none focus:ring-0 px-1 text-sm">
+                        <SelectTrigger className="h-9 w-full bg-transparent border-none focus:ring-0 px-1 text-sm disabled:opacity-100">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -191,12 +199,13 @@ export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProp
                         onChange={(e) => handleInputChange(i, "item", e.target.value)}
                         onKeyDown={(e) => handleKeyDown(e, i, "item")}
                         onFocus={() => handleItemFocus(i)}
-                        className="h-9 w-full font-medium border-gray-200 focus:border-blue-500"
-                        placeholder="Buscar..."
+                        className="h-9 w-full font-medium border-gray-200 focus:border-blue-500 disabled:opacity-100 disabled:bg-transparent disabled:border-none"
+                        placeholder={readOnly ? "" : "Buscar..."}
                         autoComplete="off"
+                        disabled={readOnly}
                     />
                     {/* Suggestions */}
-                    {showSuggestions.show && showSuggestions.row === i && (
+                    {!readOnly && showSuggestions.show && showSuggestions.row === i && (
                         <div className="absolute z-50 top-full left-0 w-[400px] bg-white border border-gray-200 rounded-md shadow-xl max-h-60 overflow-y-auto mt-1">
                             {isSearching ? (
                                 <div className="p-3 text-center text-sm text-gray-500"><Loader2 className="w-4 h-4 animate-spin inline mr-2"/> Buscando...</div>
@@ -234,7 +243,8 @@ export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProp
                         min="0"
                         value={item.quantity}
                         onChange={(e) => handleInputChange(i, "quantity", Number(e.target.value))}
-                        className="h-9 w-full text-center"
+                        className="h-9 w-full text-center disabled:opacity-100 disabled:bg-transparent disabled:border-none"
+                        disabled={readOnly}
                     />
                 </div>
 
@@ -244,34 +254,22 @@ export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProp
                         id={`input-${i}-unit`}
                         value={item.unit || ""}
                         onChange={(e) => handleInputChange(i, "unit", e.target.value)}
-                        className="h-9 w-full text-center text-sm"
+                        className="h-9 w-full text-center text-sm disabled:opacity-100 disabled:bg-transparent disabled:border-none"
+                        disabled={readOnly}
                     />
                 </div>
 
                  {/* Price */}
                  <div className="p-2 w-28 shrink-0 border-r relative">
-                    {/* Display formatted price usually, edit raw number on focus? Or just show input type number? 
-                        The user asked for comma display. Input type number doesn't show commas easily. 
-                        Best approach: Show text input that formats on blur, or simple text display + hidden input?
-                        Or just keep input type number but use a display overlay?
-                        Let's try a simple approach: standard input type number for editing, but maybe use a text type and handle formatting?
-                        Actually, typical table editing: shows formatted text, click to edit.
-                        For now, to keep it simple and editable, I will keep type="number" but showing formatted text is hard in input.
-                        Alternative: Separate display div when not focused? 
-                        Let's try: Input type text using a controlled format.
-                    */}
                     <Input 
                         type="number"
                         min="0"
                         step="0.01"
                         value={item.price || 0}
                         onChange={(e) => handleInputChange(i, "price", parseFloat(e.target.value))}
-                        className="h-9 w-full text-right text-sm font-mono"
+                        className="h-9 w-full text-right text-sm font-mono disabled:opacity-100 disabled:bg-transparent disabled:border-none"
+                        disabled={readOnly}
                     />
-                    {/* A simple overlay or just accept that input[type=number] is hard to style with commas.
-                        Wait, the user wants TO SEE "1,000.00".
-                        If I change input to text, I can format it.
-                    */}
                 </div>
 
                 {/* Total - Read Only */}
@@ -284,8 +282,9 @@ export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProp
                      <Select 
                         value={item.relatedImageTag || "none"} 
                         onValueChange={(val) => handleInputChange(i, "relatedImageTag", val === "none" ? undefined : val)}
+                        disabled={readOnly}
                     >
-                        <SelectTrigger className="h-9 w-full bg-transparent border-gray-200 text-xs text-gray-600">
+                        <SelectTrigger className="h-9 w-full bg-transparent border-gray-200 text-xs text-gray-600 disabled:opacity-100 disabled:border-none">
                             <SelectValue placeholder="Ver..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -303,30 +302,43 @@ export function StudyItemsTable({ items, setItems, images }: StudyItemsTableProp
                         id={`input-${i}-description`}
                         value={item.description || ""}
                         onChange={(e) => handleInputChange(i, "description", e.target.value)}
-                        className="h-9 w-full text-sm italic text-gray-500"
-                        placeholder="Detalles..."
+                        className="h-9 w-full text-sm italic text-gray-500 disabled:opacity-100 disabled:bg-transparent disabled:border-none"
+                        placeholder={readOnly ? "" : "Detalles..."}
+                        disabled={readOnly}
                     />
                 </div>
 
                 {/* Remove */}
                 <div className="p-2 w-12 shrink-0 flex items-center justify-center">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-red-500 hover:bg-red-50" onClick={() => removeRow(i)}>
-                        <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {!readOnly && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-red-500 hover:bg-red-50" onClick={() => removeRow(i)}>
+                            <Trash2 className="w-4 h-4" />
+                        </Button>
+                    )}
                 </div>
              </div>
           ))}
       </div>
 
-      <div className="p-3 bg-gray-50 border-t flex justify-between items-center shrink-0">
-        <Button variant="outline" onClick={addNewRow} className="border-dashed text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-            <Plus className="w-4 h-4 mr-2" /> Agregar Fila
-        </Button>
-        <div className="text-right pr-4">
-             <span className="text-sm text-gray-500 uppercase font-bold mr-3">Total Estimado:</span>
-             <span className="text-xl font-bold text-blue-600">{formatCurrency(items.reduce((s, i) => s + (i.total || 0), 0))}</span>
+      {!readOnly && (
+        <div className="p-3 bg-gray-50 border-t flex justify-between items-center shrink-0">
+            <Button variant="outline" onClick={addNewRow} className="border-dashed text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                <Plus className="w-4 h-4 mr-2" /> Agregar Fila
+            </Button>
+            <div className="text-right pr-4">
+                <span className="text-sm text-gray-500 uppercase font-bold mr-3">Total Estimado:</span>
+                <span className="text-xl font-bold text-blue-600">{formatCurrency(items.reduce((s, i) => s + (i.total || 0), 0))}</span>
+            </div>
         </div>
-      </div>
+      )}
+      {readOnly && (
+          <div className="p-3 bg-gray-50 border-t flex justify-end items-center shrink-0">
+             <div className="text-right pr-4">
+                <span className="text-sm text-gray-500 uppercase font-bold mr-3">Total Estimado:</span>
+                <span className="text-xl font-bold text-blue-600">{formatCurrency(items.reduce((s, i) => s + (i.total || 0), 0))}</span>
+            </div>
+          </div>
+      )}
     </div>
   );
 }

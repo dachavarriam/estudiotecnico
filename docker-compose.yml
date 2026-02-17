@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: study-tech-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_URL=https://et.tashonduras.com
+      # Variables loaded from .env file
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Allow access to host services if needed
+    networks:
+      - tashonduras_net
+
+networks:
+  tashonduras_net:
+    external: true
+    # Assuming there is an external network where cloudflare tunnel lives.
+    # If not, remove external: true and let it create default.
+    # User mentioned "flota.tashonduras.com" uses docker-compose, likely they share a network 
+    # or just expose ports. For safety, let's expose port 3000 locally so tunnel works effortlessly.

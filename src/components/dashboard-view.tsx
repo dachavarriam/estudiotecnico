@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Plus, FileText, Filter, Calendar } from 'lucide-react';
+import { Search, Plus, FileText, Filter, Calendar, LogOut } from 'lucide-react';
 import { STUDY_STATUS_MAP } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { logout } from '@/actions/user-actions';
 
 interface Study {
     id: string;
@@ -25,7 +26,17 @@ interface Study {
 }
 
 export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const [studies] = useState<Study[]>(initialStudies);
+
+    const handleLogout = async () => {
+        await logout();
+        window.location.href = '/';
+    };
     
     // FILTERS STATE
     const [searchClient, setSearchClient] = useState('');
@@ -43,7 +54,8 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
     // FILTER LOGIC
     const filteredStudies = useMemo(() => {
         return studies.filter(s => {
-            const matchesClient = s.clientName.toLowerCase().includes(searchClient.toLowerCase());
+            const clientName = s.clientName || '';
+            const matchesClient = clientName.toLowerCase().includes(searchClient.toLowerCase());
             const matchesEng = filterEngineer === 'ALL' || s.engineerId === filterEngineer;
             const matchesStatus = filterStatus === 'ALL' || s.status === filterStatus;
             
@@ -125,7 +137,7 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
         const headers = ['ID', 'Cliente', 'Ingeniero', 'Estado', 'Fecha Creación', 'Inicio', 'Fin', 'Tipo', 'Ubicación'];
         const rows = filteredStudies.map(s => [
             s.id,
-            `"${s.clientName.replace(/"/g, '""')}"`, // Escape quotes
+            `"${(s.clientName || '').replace(/"/g, '""')}"`, // Escape quotes and handle null
             s.engineerId || '',
             STUDY_STATUS_MAP[s.status as keyof typeof STUDY_STATUS_MAP] || s.status,
             new Date(s.date).toLocaleDateString(),
@@ -150,6 +162,10 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
         document.body.removeChild(link);
     };
 
+    if (!mounted) {
+        return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400">Cargando Dashboard...</div>;
+    }
+
     return (
         <div className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans">
             <div className="max-w-7xl mx-auto space-y-8">
@@ -161,6 +177,9 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
                     <p className="text-gray-500 mt-1">Analítica y seguimiento de reportes técnicos.</p>
                 </div>
                 <div className="flex gap-2">
+                    <Button variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={handleLogout}>
+                        <LogOut className="w-4 h-4 mr-2" /> Salir
+                    </Button>
                     <Button variant="outline" onClick={handleExportCSV}>
                         <FileText className="w-4 h-4 mr-2" /> Exportar CSV
                     </Button>

@@ -24,16 +24,42 @@ export async function uploadStudyImage(formData: FormData) {
 export async function createTechnicalStudy(data: any) {
   try {
     console.log('Creating Technical Study in NocoDB:', data);
+
+    // 1. Find the Engineer's Internal ID if we have a Slack ID
+    let engineerInternalId = null;
+    if (data.engineerId) {
+        try {
+            const { getUserBySlackId } = await import('@/actions/user-actions');
+            const uRes = await getUserBySlackId(data.engineerId);
+            if (uRes.success && uRes.data) {
+                engineerInternalId = uRes.data.Id;
+            } else {
+                 // Create dummy user if not exists for testing? Or just warn.
+                 console.warn(`Engineer with Slack ID ${data.engineerId} not found in Users table.`);
+            }
+        } catch (e) {
+            console.error("Error looking up engineer:", e);
+        }
+    }
     
     const newStudy = await nocodb.create(NOCODB_TABLES.technical_studies, {
       client_id: Number(data.clientId),
       client_name: data.clientName || `Client #${data.clientId}`, 
       study_identifier: data.title || `Study ${new Date().toISOString()}`,
-      status: 'draft', // specific value expected by NocoDB enum? Or string?
+      status: 'draft', 
       date: new Date().toISOString(),
     }) as any;
 
     const studyId = newStudy.Id;
+
+    // Link Engineer if found
+    if (engineerInternalId) {
+        try {
+            await nocodb.link(NOCODB_TABLES.technical_studies, studyId, 'users', engineerInternalId);
+        } catch (linkErr) {
+            console.error("Error linking engineer to study:", linkErr);
+        }
+    }
 
     const { sendNotification, getStartStudyBlocks } = await import('@/lib/slack');
     
@@ -75,67 +101,56 @@ export async function saveStudyDetails(id: string, data: any) {
                      } catch (e) { console.error('Failed to auto-create supply', e); }
                 }
 
-                const newM = await nocodb.create(NOCODB_TABLES.study_materials, {
+                await nocodb.create(NOCODB_TABLES.study_materials, {
                     item: item.item,
                     quantity: item.quantity,
                     unit: item.unit,
                     category: item.category,
                     description: item.description,
-                }) as any;
-                if (newM && newM.Id) {
-                    await nocodb.link(NOCODB_TABLES.technical_studies, id, 'study_materials_list', newM.Id);
-                }
+                    technical_studies_id: id // Direct Link
+                });
             }
         }
         
         // 3. Save Actions
         if (data.actions && data.actions.length > 0) {
             for (const a of data.actions) {
-                const newA = await nocodb.create(NOCODB_TABLES.study_actions, {
+                await nocodb.create(NOCODB_TABLES.study_actions, {
                     action: a,
-                }) as any;
-                if (newA && newA.Id) {
-                    await nocodb.link(NOCODB_TABLES.technical_studies, id, 'study_actions_list', newA.Id);
-                }
+                    technical_studies_id: id
+                });
             }
         }
 
         // 4. Save Comments
         if (data.comments && data.comments.length > 0) {
             for (const c of data.comments) {
-                const newC = await nocodb.create(NOCODB_TABLES.study_comments, {
+                await nocodb.create(NOCODB_TABLES.study_comments, {
                     full_comment: c,
-                }) as any;
-                if (newC && newC.Id) {
-                    await nocodb.link(NOCODB_TABLES.technical_studies, id, 'study_comments_list', newC.Id);
-                }
+                    technical_studies_id: id
+                });
             }
         }
         
         // 5. Images (Photos)
         if (data.images && data.images.length > 0) {
             for (const img of data.images) {
-                const newP = await nocodb.create(NOCODB_TABLES.study_photos, {
+                await nocodb.create(NOCODB_TABLES.study_photos, {
                     tag: img.tag,
-                    photo: img.attachment_data, 
-                }) as any;
-                if (newP && newP.Id) {
-                    await nocodb.link(NOCODB_TABLES.technical_studies, id, 'study_photos_list', newP.Id);
-                }
+                    photo: img.attachment_data,
+                    technical_studies_id: id
+                });
             }
         }
 
         // 6. Voice Notes
         if (data.notes && data.notes.length > 0) {
             for (const note of data.notes) {
-                const newVN = await nocodb.create(NOCODB_TABLES.voice_notes, {
+                await nocodb.create(NOCODB_TABLES.voice_notes, {
                     transcription: note.transcription,
-                    CreatedAt: new Date(note.timestamp).toISOString()
-                }) as any;
-                
-                if (newVN && newVN.Id) {
-                    await nocodb.link(NOCODB_TABLES.technical_studies, id, 'voice_notes_list', newVN.Id);
-                }
+                    CreatedAt: new Date(note.timestamp).toISOString(),
+                    technical_studies_id: id
+                });
             }
         }
         
@@ -206,7 +221,6 @@ export async function getStudy(id: string) {
                 ...study,
                 items: safeParse(study.items), 
                 actions: safeParse(study.actions),
-                // client_name might be in study or need fetch? study has client_name column.
             }
         };
     } catch (error: any) {
@@ -244,6 +258,55 @@ export async function getAllStudies() {
         };
     } catch (error: any) {
         console.error("Error fetching all studies:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function getEngineerStudies(engineerId: string) {
+    try {
+        let whereClause = '';
+
+        // 1. Resolve Slack ID to Internal ID
+        const { getUserBySlackId } = await import('@/actions/user-actions');
+        const uRes = await getUserBySlackId(engineerId);
+        
+        if (uRes.success && uRes.data) {
+            const internalId = uRes.data.Id;
+            // Filter by Link. NocoDB syntax for Many-Many or One-Many is often (Column,anyof,ID) or (Column,eq,ID)
+            // 'users' is the column name in technical_studies
+            whereClause = `(users,anyof,${internalId})`; 
+        } else {
+            // Engineer not found, return empty or try direct string match fallback (unlikely to work if column doesn't exist)
+            console.warn(`Engineer ${engineerId} not found in Users table. Returning empty list.`);
+            return { success: true, data: [] };
+        }
+
+        const result = await nocodb.list(NOCODB_TABLES.technical_studies, {
+             sort: '-CreatedAt', 
+             where: whereClause
+        }) as any;
+
+        const list = result.list || result || [];
+        
+        return { 
+            success: true, 
+            data: list.map((s: any) => ({
+                id: s.Id,
+                clientCount: s.client_id, 
+                clientName: s.client_name,
+                status: s.status,
+                date: s.date || s.CreatedAt,
+                location: s.location,
+                type: s.study_type,
+                createdAt: s.CreatedAt,
+                startedAt: s.started_at,
+                submittedAt: s.submitted_at,
+                approvedAt: s.approved_at,
+                engineerId: s.engineer_id
+            })) 
+        };
+    } catch (error: any) {
+        console.error("Error fetching engineer studies:", error);
         return { success: false, error: error.message };
     }
 }

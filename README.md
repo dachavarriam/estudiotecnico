@@ -43,8 +43,31 @@ Plataforma web para la administración, ejecución y análisis de estudios técn
 
 4. Ejecutar servidor de desarrollo:
    ```bash
+
+   ```
    npm run dev
    ```
+
+   ```
+
+## Despliegue (Docker)
+
+Esta aplicación está lista para ser desplegada como container utilizando Docker Compose.
+
+1. Asegúrese de tener un archivo `.env` configurado en la raíz del proyecto.
+2. Ejecute el siguiente comando para construir y levantar el servicio:
+
+   ```bash
+   docker-compose up -d --build
+   ```
+
+3. La aplicación estará disponible en `http://localhost:3000` (o expuesta para su Cloudflare Tunnel).
+
+**Notas de Producción:**
+
+- El `Dockerfile` utiliza una construcción _standalone_ para optimizar el tamaño de la imagen.
+- `docker-compose.yml` expone el puerto 3000.
+- `next.config.ts` ha sido configurado para permitir orígenes como `et.tashonduras.com`.
 
 ## Documentación Adicional
 

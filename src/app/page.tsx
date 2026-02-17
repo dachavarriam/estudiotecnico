@@ -1,58 +1,73 @@
-import Link from 'next/link';
+import { getSession } from '@/actions/user-actions';
+import { LoginButton } from '@/components/login-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Briefcase, HardHat } from 'lucide-react';
+import { LogOut, LayoutDashboard } from 'lucide-react';
+import Link from 'next/link';
+import { logout } from '@/actions/user-actions';
 
-export default function Home() {
+export const dynamic = 'force-dynamic';
+
+export default async function Home() {
+  const session = await getSession();
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gray-50">
-      <div className="z-10 max-w-5xl w-full flex flex-col items-center justify-between font-mono text-sm">
-        <h1 className="text-4xl font-bold bg-gradient-to-tr from-blue-600 to-purple-400 bg-clip-text text-transparent mb-12">
-          Estudios Técnicos
-        </h1>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
-          {/* Director Flow */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-blue-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-blue-700">
-                <Briefcase className="h-6 w-6" />
-                Director / Operaciones
-              </CardTitle>
-              <CardDescription>
-                Crear nuevos estudios, asignar ingenieros y gestionar clientes.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/dashboard" passHref>
-                <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                  Ir al Dashboard
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          {/* Engineer Flow */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-orange-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-700">
-                <HardHat className="h-6 w-6" />
-                Ingeniero en Sitio
-              </CardTitle>
-              <CardDescription>
-                Realizar levantamiento, grabar notas de voz y generar reportes.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* For demo purposes linking to a fixed ID, in production this would be dynamic */}
-              <Link href="/engineer/study/123" passHref>
-                <Button className="w-full bg-orange-600 hover:bg-orange-700">
-                  Ir a Estudio (Demo #123)
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gray-50 bg-[url('/grid.svg')]">
+      <div className="z-10 w-full max-w-5xl flex flex-col items-center justify-between font-sans">
+        
+        <div className="mb-12 text-center">
+             <h1 className="text-5xl font-extrabold bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent mb-4">
+              Estudios Técnicos
+            </h1>
+            <p className="text-gray-500 text-lg">Sistema de Gestión de Levantamientos y Reportes</p>
         </div>
+
+        {!session ? (
+            <div className="w-full max-w-sm">
+                <Card className="border-0 shadow-lg">
+                    <CardHeader className="text-center pb-2">
+                        <CardTitle>Bienvenido</CardTitle>
+                        <CardDescription>Inicia sesión con tu cuenta de TASHonduras (Slack)</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <LoginButton />
+                    </CardContent>
+                </Card>
+            </div>
+        ) : (
+            <div className="flex flex-col items-center w-full max-w-md space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <Card className="w-full border-green-200 shadow-md bg-white/80 backdrop-blur">
+                    <CardHeader className="text-center">
+                        <CardTitle className="text-xl text-green-800">Bienvenido, {session.name}</CardTitle>
+                        <CardDescription className="uppercase font-bold text-xs tracking-wider text-green-600">
+                            Rol: {session.role === 'director' ? 'Director / Admin' : 'Ingeniero de Campo'}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <Link href={session.role === 'director' ? '/dashboard' : '/engineer/dashboard'} passHref>
+                            <Button className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg">
+                                <LayoutDashboard className="mr-2 h-5 w-5" /> Ir al Dashboard
+                            </Button>
+                        </Link>
+                        
+                        <form action={async () => {
+                            'use server';
+                            await logout();
+                        }}>
+                            <Button variant="ghost" className="w-full text-gray-500 hover:text-red-600 hover:bg-red-50">
+                                <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
+        )}
+
+      </div>
+          
+      {/* Footer Info */}
+      <div className="fixed bottom-4 text-xs text-gray-400">
+        TAS Honduras &copy; 2026
       </div>
     </main>
   );
