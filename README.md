@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sistema de Gestión de Estudios Técnicos
 
-## Getting Started
+Plataforma web para la administración, ejecución y análisis de estudios técnicos de campo. Diseñado para optimizar los tiempos de respuesta y mejorar la calidad de los reportes.
 
-First, run the development server:
+## Características Principales
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Dashboard Ejecutivo**: Métricas en tiempo real, KPIs de rendimiento y filtrado avanzado.
+- **App de Campo**: Interfaz móvil para ingenieros con carga de fotos, notas de voz y manejo de materiales.
+- **Integración NocoDB**: Base de datos flexible y escalable.
+- **Analítica**: Seguimiento de tiempos de ciclo (Reacción, Ejecución, Revisión).
+- **Exportación**: Generación de reportes en PDF y exportación de datos a CSV/Excel.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tecnologías
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Framework**: Next.js 14+ (App Router)
+- **Lenguaje**: TypeScript
+- **UI**: Tailwind CSS, Shadcn/ui
+- **Base de Datos**: NocoDB (API)
+- **Integraciones**: Slack (Notificaciones)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Instalación
 
-## Learn More
+1. Clonar el repositorio:
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   git clone https://github.com/dachavarriam/estudiotecnico.git
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. Instalar dependencias:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```bash
+   cd web
+   npm install
+   ```
 
-## Deploy on Vercel
+3. Configurar variables de entorno (`.env`):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   ```
+   NOCODB_URL=...
+   NOCODB_API_TOKEN=...
+   SLACK_BOT_TOKEN=...
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. Ejecutar servidor de desarrollo:
+   ```bash
+   npm run dev
+   ```
+
+## Documentación Adicional
+
+- [Manual de Instrucciones](INSTRUCTION_MANUAL.md): Guía de uso para Directores e Ingenieros.
+- [Changelog](CHANGELOG.md): Historial de cambios y versiones.
