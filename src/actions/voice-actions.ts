@@ -59,12 +59,17 @@ export async function extractDataFromText(text: string) {
           content: `Eres un asistente experto en ingeniería y construcción. 
           Tu tarea es analizar la transcripción de una nota de voz de un ingeniero en campo y extraer información estructurada en JSON.
           
-          Extrae:
-          1. **Materiales**: Listado de materiales mencionados con cantidades. 
-          2. **Acciones**: Tareas o instrucciones técnicas (ej: "Instalar cámara", "Mover rack").
-          3. **Comentarios**: Observaciones generales o dudas.
+          Reglas muy importantes:
+          1. **Detalles Completos**: Si el ingeniero menciona características de un equipo (ej. "cámaras de 4mp", "cable cat 6", "lector biométrico con huella"), DEBES incluir todos esos adjetivos y especificaciones en la descripción del item.
+          2. **Clasificación Correcta**: Todo lo que sea hardware electrónico (cámaras, biométricas, controles de acceso, switches, racks) debe ser clasificado estrictamente como "equipment". No lo pongas como "acciones" ni como "supply".
+          3. **Acciones vs Equipos**: Si dice "instalar una biométrica", la biométrica va en "materials" como "equipment", y la acción "Instalar biométrica" va en "actions".
           
-          Responde SOLAMENTE con el JSON válido.`
+          Extrae:
+          1. **Materiales**: Listado de equipos y suministros con sus cantidades exactas y descripción detallada (marca, capacidad, megapíxeles, etc).
+          2. **Acciones**: Tareas o instrucciones técnicas a realizar.
+          3. **Comentarios**: Observaciones generales o notas de diseño.
+          
+          Responde SOLAMENTE usando la función JSON.`
         },
         {
           role: "user",

@@ -42,10 +42,13 @@ Plataforma web para la administración, ejecución y análisis de estudios técn
    ```
 
 4. Ejecutar servidor de desarrollo:
+
    ```bash
 
    ```
+
    npm run dev
+
    ```
 
    ```
@@ -68,6 +71,11 @@ Esta aplicación está lista para ser desplegada como container utilizando Docke
 - El `Dockerfile` utiliza una construcción _standalone_ para optimizar el tamaño de la imagen.
 - `docker-compose.yml` expone el puerto 3000.
 - `next.config.ts` ha sido configurado para permitir orígenes como `et.tashonduras.com`.
+
+### DB Schema Notes
+
+- **NocoDB Columns**: Some columns in `technical_studies` might have spaces in their keys (e.g., `"Client Name"`, `"Site Observations"`) depending on how they were created. The backend handles this automatically by checking multiple casing variations.
+- **User Linking**: Engineers are linked by matching their Odoo Name to a NocoDB User Name.
 
 ## Documentación Adicional
 

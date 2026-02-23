@@ -43,3 +43,25 @@
 
 - Error de construcción por caracteres especiales en JSX del Dashboard.
 - Referencia indefinida a `studyData` en la exportación de materiales.
+
+## [0.1.1] - 2026-02-18
+
+### Added
+
+- **Versionamiento de Estudios (`StudyVersions`)**:
+  - Botón "History" en la vista de estudio para crear y ver snapshots.
+  - Guarda estado completo (Items, Comentarios, etc.) en tabla `StudyVersions` de NocoDB.
+- **Sistema de Seguidores (`StudyFollowers`)**:
+  - Botón "Bell" para seguir/dejar de seguir un estudio.
+  - Tabla puente `StudyFollowers` en NocoDB para relacionar Users <-> Studies.
+- **Documentación de Esquema**:
+  - Archivo `NOCODB_SCHEMA.md` detallando la estructura de base de datos y relaciones.
+
+### Fixed
+
+- **Creación de Estudios**:
+  - Corrección de error `400` por formato inválido en campo `categories`.
+  - Corrección de error `422` en atribución de usuario (graceful fallback).
+- **Consistencia de Datos**:
+  - Uso estricto de IDs numéricos para enlaces en NocoDB (evita `ERR_INVALID_PK_VALUE`).
+  - Carga robusta de variables de entorno para scripts de mantenimiento.

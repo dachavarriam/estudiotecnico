@@ -2,11 +2,12 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Plus, FileText, Filter, Calendar, LogOut } from 'lucide-react';
+import { Search, Plus, FileText, Filter, Calendar, LogOut, CheckCircle, X } from 'lucide-react';
 import { STUDY_STATUS_MAP } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { logout } from '@/actions/user-actions';
@@ -39,11 +40,28 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
     };
     
     // FILTERS STATE
-    const [searchClient, setSearchClient] = useState('');
+    const [searchClient, setSearchClient] = useState('ALL');
     const [filterEngineer, setFilterEngineer] = useState('ALL');
     const [filterStatus, setFilterStatus] = useState('ALL');
     const [dateStart, setDateStart] = useState('');
     const [dateEnd, setDateEnd] = useState('');
+
+    // TOAST STATE
+    const [showToast, setShowToast] = useState(false);
+    const searchParams = useSearchParams();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (searchParams.get('success')) {
+            setShowToast(true);
+            const t = setTimeout(() => {
+                setShowToast(false);
+                // Optional: Cleanup URL
+                 router.replace('/dashboard'); 
+            }, 4000);
+            return () => clearTimeout(t);
+        }
+    }, [searchParams, router]);
 
     // UNIQUE ENGINEERS
     const engineers = useMemo(() => {
@@ -51,11 +69,19 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
         return Array.from(unique);
     }, [studies]);
 
+    // UNIQUE CLIENTS
+    const uniqueClients = useMemo(() => {
+        const unique = new Set(studies.map(s => s.clientName).filter(Boolean));
+        return Array.from(unique);
+    }, [studies]);
+
     // FILTER LOGIC
     const filteredStudies = useMemo(() => {
         return studies.filter(s => {
             const clientName = s.clientName || '';
-            const matchesClient = clientName.toLowerCase().includes(searchClient.toLowerCase());
+            // If searchClient is 'ALL' or empty, match all. Else match exact name (since it's a select)
+            const matchesClient = !searchClient || searchClient === 'ALL' || clientName === searchClient;
+            
             const matchesEng = filterEngineer === 'ALL' || s.engineerId === filterEngineer;
             const matchesStatus = filterStatus === 'ALL' || s.status === filterStatus;
             
@@ -167,7 +193,21 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans">
+        <div className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans relative">
+            {/* FLOATING TOAST NOTIFICATION */}
+            <div className={`fixed top-4 right-4 z-50 transition-all duration-500 transform ${showToast ? 'translate-x-0 opacity-100' : 'translate-x-[120%] opacity-0'}`}>
+                <div className="bg-white border-l-4 border-green-500 shadow-lg rounded-r-lg p-4 flex items-start gap-3 w-80">
+                    <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                    <div className="flex-1">
+                        <h4 className="text-sm font-bold text-gray-900">¡Estudio Creado!</h4>
+                        <p className="text-sm text-gray-500 mt-1">El estudio ha sido asignado correctamente al ingeniero.</p>
+                    </div>
+                    <button onClick={() => setShowToast(false)} className="text-gray-400 hover:text-gray-600">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
             <div className="max-w-7xl mx-auto space-y-8">
             
             {/* Header / Actions */}
@@ -196,26 +236,32 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
                 <CardContent className="p-4 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                     <div className="space-y-2 md:col-span-1">
                         <label className="text-xs font-bold text-gray-500 uppercase">Cliente</label>
-                        <div className="relative">
-                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                            <Input 
-                                placeholder="Buscar..." 
-                                className="pl-8" 
-                                value={searchClient}
-                                onChange={(e) => setSearchClient(e.target.value)}
-                            />
-                        </div>
+                        <Select value={searchClient} onValueChange={setSearchClient}>
+                            <SelectTrigger className="w-full truncate">
+                                <SelectValue placeholder="Todos" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60">
+                                <SelectItem value="ALL">Todos</SelectItem>
+                                {uniqueClients.map((client: string) => (
+                                    <SelectItem key={client} value={client}>
+                                        <span className="truncate block max-w-[200px] text-sm" title={client}>{client}</span>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500 uppercase">Ingeniero</label>
                         <Select value={filterEngineer} onValueChange={setFilterEngineer}>
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full truncate">
                                 <SelectValue placeholder="Todos" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="max-h-60">
                                 <SelectItem value="ALL">Todos</SelectItem>
                                 {engineers.map((eng: any) => (
-                                    <SelectItem key={eng} value={eng}>{eng}</SelectItem>
+                                    <SelectItem key={eng} value={eng}>
+                                        <span className="truncate block max-w-[200px] text-sm" title={eng}>{eng}</span>
+                                    </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

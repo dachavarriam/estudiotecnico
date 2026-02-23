@@ -19,7 +19,12 @@ export async function getUserBySlackId(slackId: string) {
         const list = result.list || result || [];
         
         // Find in memory (handles spaces in keys better)
-        const user = list.find((u: any) => u['Slack ID'] === slackId || u.slack_id === slackId);
+        // Also support lookup by internal ID (if Slack ID missing)
+        const user = list.find((u: any) => 
+            u['Slack ID'] === slackId || 
+            u.slack_id === slackId || 
+            String(u.Id) === String(slackId) // Match by ID string execution
+        );
 
         if (user) {
             return { success: true, data: user };
@@ -65,25 +70,35 @@ export async function getAllUsers() {
 }
 
 
-import { auth, signOut } from "@/auth";
+// Simple Cookie-based Session (Restored for Dev Branch)
+import { cookies } from 'next/headers';
 
-export async function login() {
-    // No-op: Login is handled by NextAuth signIn() in the UI components
+export async function login(userId: string, role: string, name: string) {
+    const cookieStore = await cookies();
+    // Set cookies for 7 days
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    
+    cookieStore.set('session_userid', userId, { expires });
+    cookieStore.set('session_role', role, { expires });
+    cookieStore.set('session_username', name, { expires });
+    
     return { success: true };
 }
 
 export async function logout() {
-    await signOut({ redirectTo: "/" });
+    const cookieStore = await cookies();
+    cookieStore.delete('session_userid');
+    cookieStore.delete('session_role');
+    cookieStore.delete('session_username');
     return { success: true };
 }
 
 export async function getSession() {
-    const session = await auth();
-    if (!session?.user) return null;
+    const cookieStore = await cookies();
+    const userId = cookieStore.get('session_userid')?.value;
+    const role = cookieStore.get('session_role')?.value;
+    const name = cookieStore.get('session_username')?.value;
     
-    return { 
-        userId: (session.user as any).slack_id, 
-        role: (session.user as any).role, 
-        name: session.user.name 
-    };
+    if (!userId) return null;
+    return { userId, role, name };
 }

@@ -28,7 +28,7 @@ interface Employee {
 
 interface EmployeeSelectProps {
   value?: string // ID as string for consistency with form
-  onSelect: (employeeId: string) => void
+  onSelect: (employeeId: string, employeeName?: string) => void
 }
 
 export function EmployeeSelect({ value, onSelect }: EmployeeSelectProps) {
@@ -85,7 +85,7 @@ export function EmployeeSelect({ value, onSelect }: EmployeeSelectProps) {
                   key={emp.id}
                   value={String(emp.id)}
                   onSelect={(currentValue) => {
-                    onSelect(String(emp.id))
+                    onSelect(String(emp.id), emp.name)
                     setOpen(false)
                   }}
                 >

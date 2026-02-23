@@ -20,6 +20,24 @@ const schema = z.object({
   images: z.array(z.object({
     url: z.string(),
     tag: z.string()
+  })).optional(),
+  location: z.string().optional(),
+  contact_info: z.string().optional(),
+  categories: z.array(z.string()).optional(),
+  site_observations: z.string().optional(),
+  estimated_hours: z.string().optional(),
+  estimated_engineers: z.string().optional(),
+  estimated_technicians: z.string().optional(),
+  schedule_type: z.string().optional(),
+  visit_date: z.string().optional(),
+  visit_type: z.string().optional(),
+  engineer_plans: z.array(z.object({
+    title: z.string(),
+    url: z.string()
+  })).optional(),
+  director_files: z.array(z.object({
+    title: z.string(),
+    url: z.string()
   })).optional()
 });
 

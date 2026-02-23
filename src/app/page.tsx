@@ -1,5 +1,5 @@
-import { getSession } from '@/actions/user-actions';
-import { LoginButton } from '@/components/login-button';
+import { getSession, getAllUsers } from '@/actions/user-actions';
+import { MockAuthToggle } from '@/components/mock-auth-toggle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LogOut, LayoutDashboard } from 'lucide-react';
@@ -10,6 +10,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function Home() {
   const session = await getSession();
+  const usersRes = await getAllUsers();
+  const users = usersRes.success ? usersRes.data : [];
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gray-50 bg-[url('/grid.svg')]">
@@ -30,7 +32,7 @@ export default async function Home() {
                         <CardDescription>Inicia sesión con tu cuenta de TASHonduras (Slack)</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <LoginButton />
+                        <MockAuthToggle users={users} />
                     </CardContent>
                 </Card>
             </div>
