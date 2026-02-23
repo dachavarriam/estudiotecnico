@@ -17,15 +17,23 @@ export class NocoDBClient {
   // Helper to get ID if name passed?
   // For now, we will update callers to use constants.
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    // Lazy load env vars if missing (helper for scripts/testing)
+    const baseUrl = this.baseUrl || process.env.NOCODB_URL;
+    const apiToken = this.apiToken || process.env.NOCODB_API_TOKEN;
+
+    if (!baseUrl || !apiToken) {
+         throw new Error("NocoDB Configuration Missing: NOCODB_URL or NOCODB_API_TOKEN not set.");
+    }
+
     // If path starts with 'supplies' or other known names, we might want to swap it?
     // But better to update the strings at the source.
-    const url = `${this.baseUrl}/api/v1/db/data/noco/${process.env.NOCODB_PROJECT_ID}/${path}`;
+    const url = `${baseUrl}/api/v1/db/data/noco/${process.env.NOCODB_PROJECT_ID}/${path}`;
     console.log(`[NocoDB] Requesting Table: ${path.split('?')[0]}`);
 
     const res = await fetch(url, {
       ...options,
       headers: {
-        'xc-token': this.apiToken,
+        'xc-token': apiToken,
         'Content-Type': 'application/json',
         ...options.headers,
       },
@@ -79,11 +87,14 @@ export class NocoDBClient {
   }
 
   async upload(formData: FormData) {
-    const url = `${this.baseUrl}/api/v1/db/storage/upload?path=`; 
+    const baseUrl = this.baseUrl || process.env.NOCODB_URL;
+    const apiToken = this.apiToken || process.env.NOCODB_API_TOKEN;
+
+    const url = `${baseUrl}/api/v1/db/storage/upload?path=`; 
     const response = await fetch(url, {
         method: 'POST',
         headers: {
-            'xc-token': this.apiToken,
+            'xc-token': apiToken!,
             // Content-Type is set automatically with FormData
         },
         body: formData

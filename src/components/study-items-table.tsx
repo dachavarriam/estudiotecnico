@@ -10,7 +10,7 @@ interface StudyItem {
   item: string;
   quantity: number;
   unit?: string;
-  category?: "equipment" | "supply";
+  category?: "equipment" | "supply" | "labor";
   relatedImageTag?: string;
   description?: string;
   price?: number; // Added Price
@@ -29,9 +29,10 @@ interface StudyItemsTableProps {
   setItems: (items: StudyItem[]) => void;
   images: SiteImage[];
   readOnly?: boolean;
+  defaultCategory?: "equipment" | "supply" | "labor";
 }
 
-export function StudyItemsTable({ items, setItems, images, readOnly = false }: StudyItemsTableProps) {
+export function StudyItemsTable({ items, setItems, images, readOnly = false, defaultCategory }: StudyItemsTableProps) {
   const [focusedRow, setFocusedRow] = useState<number | null>(null);
   
   // ... (rest of search logic) ...
@@ -131,7 +132,9 @@ export function StudyItemsTable({ items, setItems, images, readOnly = false }: S
 
   const addNewRow = () => {
     if (readOnly) return;
-    setItems([...items, { item: "", quantity: 1, unit: "und", category: "supply" }]);
+    const cat = defaultCategory || "supply";
+    const unit = cat === 'labor' ? 'hr' : 'und';
+    setItems([...items, { item: "", quantity: 1, unit: unit, category: cat as any }]);
   };
 
   const removeRow = (index: number) => {
@@ -156,168 +159,173 @@ export function StudyItemsTable({ items, setItems, images, readOnly = false }: S
 
   return (
     <div className="flex flex-col h-full bg-white shadow-sm rounded-md border min-h-[500px]">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-gray-100 border-b">
-         <div className="flex text-xs font-semibold text-gray-600 uppercase tracking-wider">
-            <div className="p-3 w-32 shrink-0 border-r">Tipo</div>
-            <div className="p-3 grow shrink-0 min-w-[300px] border-r">Item / Producto</div>
-            <div className="p-3 w-20 shrink-0 text-center border-r">Cant.</div>
-            <div className="p-3 w-20 shrink-0 text-center border-r">Unid.</div>
-            <div className="p-3 w-28 shrink-0 text-right border-r">Precio</div>
-            <div className="p-3 w-28 shrink-0 text-right border-r">Total</div>
-            <div className="p-3 w-32 shrink-0 border-r">Foto Ref.</div>
-            <div className="p-3 w-64 shrink-0 border-r">Notas</div>
-            <div className="p-3 w-12 shrink-0"></div>
-         </div>
-      </div>
-
-      <div className="overflow-auto flex-1 relative" ref={tableContainerRef}>
-          {items.map((item, i) => (
-             <div key={i} className="flex border-b hover:bg-slate-50 relative group items-start">
-                {/* Category */}
-                <div className="p-2 w-32 shrink-0 border-r">
-                    <Select 
-                        value={item.category} 
-                        onValueChange={(val: any) => handleInputChange(i, "category", val)}
-                        disabled={readOnly}
-                    >
-                        <SelectTrigger className="h-9 w-full bg-transparent border-none focus:ring-0 px-1 text-sm disabled:opacity-100">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="equipment">Equipo</SelectItem>
-                            <SelectItem value="supply">Suministro</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Item Search */}
-                <div className="p-2 grow shrink-0 min-w-[300px] border-r relative">
-                    <Input 
-                        id={`input-${i}-item`}
-                        value={item.item}
-                        onChange={(e) => handleInputChange(i, "item", e.target.value)}
-                        onKeyDown={(e) => handleKeyDown(e, i, "item")}
-                        onFocus={() => handleItemFocus(i)}
-                        className="h-9 w-full font-medium border-gray-200 focus:border-blue-500 disabled:opacity-100 disabled:bg-transparent disabled:border-none"
-                        placeholder={readOnly ? "" : "Buscar..."}
-                        autoComplete="off"
-                        disabled={readOnly}
-                    />
-                    {/* Suggestions */}
-                    {!readOnly && showSuggestions.show && showSuggestions.row === i && (
-                        <div className="absolute z-50 top-full left-0 w-[400px] bg-white border border-gray-200 rounded-md shadow-xl max-h-60 overflow-y-auto mt-1">
-                            {isSearching ? (
-                                <div className="p-3 text-center text-sm text-gray-500"><Loader2 className="w-4 h-4 animate-spin inline mr-2"/> Buscando...</div>
-                            ) : suggestions.length > 0 ? (
-                                suggestions.map((prod) => (
-                                    <div 
-                                        key={prod.id} 
-                                        className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0"
-                                        onClick={() => selectProduct(i, prod)}
-                                    >
-                                        <div className="text-sm font-bold text-gray-800">{prod.name}</div>
-                                        <div className="flex justify-between text-xs mt-1">
-                                            <span className={`px-1.5 py-0.5 rounded ${prod.source === 'odoo' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
-                                                {prod.source === 'odoo' ? 'Odoo' : 'Local'}
-                                            </span>
-                                            <span className="text-gray-600 font-mono">{formatCurrency(prod.price)}</span>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="p-3 text-sm text-gray-400 italic bg-gray-50">
-                                    No encontrado. <br/>
-                                    <span className="text-xs">Se guardará como nuevo item al finalizar.</span>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Quantity */}
-                <div className="p-2 w-20 shrink-0 border-r">
-                    <Input 
-                        id={`input-${i}-quantity`}
-                        type="number"
-                        min="0"
-                        value={item.quantity}
-                        onChange={(e) => handleInputChange(i, "quantity", Number(e.target.value))}
-                        className="h-9 w-full text-center disabled:opacity-100 disabled:bg-transparent disabled:border-none"
-                        disabled={readOnly}
-                    />
-                </div>
-
-                {/* Unit */}
-                <div className="p-2 w-20 shrink-0 border-r">
-                    <Input 
-                        id={`input-${i}-unit`}
-                        value={item.unit || ""}
-                        onChange={(e) => handleInputChange(i, "unit", e.target.value)}
-                        className="h-9 w-full text-center text-sm disabled:opacity-100 disabled:bg-transparent disabled:border-none"
-                        disabled={readOnly}
-                    />
-                </div>
-
-                 {/* Price */}
-                 <div className="p-2 w-28 shrink-0 border-r relative">
-                    <Input 
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.price || 0}
-                        onChange={(e) => handleInputChange(i, "price", parseFloat(e.target.value))}
-                        className="h-9 w-full text-right text-sm font-mono disabled:opacity-100 disabled:bg-transparent disabled:border-none"
-                        disabled={readOnly}
-                    />
-                </div>
-
-                {/* Total - Read Only */}
-                <div className="p-2 w-28 shrink-0 border-r flex items-center justify-end font-mono text-sm font-medium text-gray-700">
-                    {formatCurrency(item.total || 0)}
-                </div>
-
-                {/* Photo Ref */}
-                <div className="p-2 w-32 shrink-0 border-r">
-                     <Select 
-                        value={item.relatedImageTag || "none"} 
-                        onValueChange={(val) => handleInputChange(i, "relatedImageTag", val === "none" ? undefined : val)}
-                        disabled={readOnly}
-                    >
-                        <SelectTrigger className="h-9 w-full bg-transparent border-gray-200 text-xs text-gray-600 disabled:opacity-100 disabled:border-none">
-                            <SelectValue placeholder="Ver..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">-- Sin Foto --</SelectItem>
-                            {images.map(img => (
-                                <SelectItem key={img.id} value={img.tag}>{img.tag}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Notes */}
-                <div className="p-2 w-64 shrink-0 border-r">
-                    <Input 
-                        id={`input-${i}-description`}
-                        value={item.description || ""}
-                        onChange={(e) => handleInputChange(i, "description", e.target.value)}
-                        className="h-9 w-full text-sm italic text-gray-500 disabled:opacity-100 disabled:bg-transparent disabled:border-none"
-                        placeholder={readOnly ? "" : "Detalles..."}
-                        disabled={readOnly}
-                    />
-                </div>
-
-                {/* Remove */}
-                <div className="p-2 w-12 shrink-0 flex items-center justify-center">
-                    {!readOnly && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-red-500 hover:bg-red-50" onClick={() => removeRow(i)}>
-                            <Trash2 className="w-4 h-4" />
-                        </Button>
-                    )}
-                </div>
+      <div className="overflow-x-auto overflow-y-visible flex-1">
+        <div className="min-w-[1000px]">
+          {/* Sticky Header */}
+          <div className="sticky top-0 z-20 bg-gray-100 border-b">
+             <div className="flex text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <div className="p-3 w-32 shrink-0 border-r">Tipo</div>
+                <div className="p-3 grow shrink-0 min-w-[300px] border-r">Item / Producto</div>
+                <div className="p-3 w-20 shrink-0 text-center border-r">Cant.</div>
+                <div className="p-3 w-20 shrink-0 text-center border-r">Unid.</div>
+                <div className="p-3 w-28 shrink-0 text-right border-r">Precio</div>
+                <div className="p-3 w-28 shrink-0 text-right border-r">Total</div>
+                <div className="p-3 w-32 shrink-0 border-r">Foto Ref.</div>
+                <div className="p-3 w-64 shrink-0 border-r">Notas</div>
+                <div className="p-3 w-12 shrink-0"></div>
              </div>
-          ))}
+          </div>
+
+          <div className="relative" ref={tableContainerRef}>
+              {items.map((item, i) => (
+                 <div key={i} className="flex border-b hover:bg-slate-50 relative group items-start">
+                    {/* Category */}
+                    <div className="p-2 w-32 shrink-0 border-r">
+                        <Select 
+                            value={item.category} 
+                            onValueChange={(val: any) => handleInputChange(i, "category", val)}
+                            disabled={readOnly || !!defaultCategory}
+                        >
+                            <SelectTrigger className="h-9 w-full bg-transparent border-none focus:ring-0 px-1 text-sm disabled:opacity-100 disabled:cursor-default">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="equipment">Equipo</SelectItem>
+                                <SelectItem value="supply">Suministro</SelectItem>
+                                <SelectItem value="labor">Mano de Obra</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Item Search */}
+                    <div className="p-2 grow shrink-0 min-w-[300px] border-r relative">
+                        <Input 
+                            id={`input-${i}-item`}
+                            value={item.item}
+                            onChange={(e) => handleInputChange(i, "item", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, i, "item")}
+                            onFocus={() => handleItemFocus(i)}
+                            className="h-9 w-full font-medium border-gray-200 focus:border-blue-500 disabled:opacity-100 disabled:bg-transparent disabled:border-none"
+                            placeholder={readOnly ? "" : "Buscar..."}
+                            autoComplete="off"
+                            disabled={readOnly}
+                        />
+                        {/* Suggestions */}
+                        {!readOnly && showSuggestions.show && showSuggestions.row === i && (
+                            <div className="absolute z-50 top-full left-0 w-[400px] bg-white border border-gray-200 rounded-md shadow-xl max-h-60 overflow-y-auto mt-1">
+                                {isSearching ? (
+                                    <div className="p-3 text-center text-sm text-gray-500"><Loader2 className="w-4 h-4 animate-spin inline mr-2"/> Buscando...</div>
+                                ) : suggestions.length > 0 ? (
+                                    suggestions.map((prod) => (
+                                        <div 
+                                            key={prod.id} 
+                                            className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0"
+                                            onClick={() => selectProduct(i, prod)}
+                                        >
+                                            <div className="text-sm font-bold text-gray-800">{prod.name}</div>
+                                            <div className="flex justify-between text-xs mt-1">
+                                                <span className={`px-1.5 py-0.5 rounded ${prod.source === 'odoo' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                                                    {prod.source === 'odoo' ? 'Odoo' : 'Local'}
+                                                </span>
+                                                <span className="text-gray-600 font-mono">{formatCurrency(prod.price)}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="p-3 text-sm text-gray-400 italic bg-gray-50">
+                                        No encontrado. <br/>
+                                        <span className="text-xs">Se guardará como nuevo item al finalizar.</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Quantity */}
+                    <div className="p-2 w-20 shrink-0 border-r">
+                        <Input 
+                            id={`input-${i}-quantity`}
+                            type="number"
+                            min="0"
+                            value={item.quantity}
+                            onChange={(e) => handleInputChange(i, "quantity", Number(e.target.value))}
+                            className="h-9 w-full text-center disabled:opacity-100 disabled:bg-transparent disabled:border-none"
+                            disabled={readOnly}
+                        />
+                    </div>
+
+                    {/* Unit */}
+                    <div className="p-2 w-20 shrink-0 border-r">
+                        <Input 
+                            id={`input-${i}-unit`}
+                            value={item.unit || ""}
+                            onChange={(e) => handleInputChange(i, "unit", e.target.value)}
+                            className="h-9 w-full text-center text-sm disabled:opacity-100 disabled:bg-transparent disabled:border-none"
+                            disabled={readOnly}
+                        />
+                    </div>
+
+                     {/* Price */}
+                     <div className="p-2 w-28 shrink-0 border-r relative">
+                        <Input 
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.price || 0}
+                            onChange={(e) => handleInputChange(i, "price", parseFloat(e.target.value))}
+                            className="h-9 w-full text-right text-sm font-mono disabled:opacity-100 disabled:bg-transparent disabled:border-none"
+                            disabled={readOnly}
+                        />
+                    </div>
+
+                    {/* Total - Read Only */}
+                    <div className="p-2 w-28 shrink-0 border-r flex items-center justify-end font-mono text-sm font-medium text-gray-700">
+                        {formatCurrency(item.total || 0)}
+                    </div>
+
+                    {/* Photo Ref */}
+                    <div className="p-2 w-32 shrink-0 border-r">
+                         <Select 
+                            value={item.relatedImageTag || "none"} 
+                            onValueChange={(val) => handleInputChange(i, "relatedImageTag", val === "none" ? undefined : val)}
+                            disabled={readOnly}
+                        >
+                            <SelectTrigger className="h-9 w-full bg-transparent border-gray-200 text-xs text-gray-600 disabled:opacity-100 disabled:border-none">
+                                <SelectValue placeholder="Ver..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">-- Sin Foto --</SelectItem>
+                                {images.map(img => (
+                                    <SelectItem key={img.id} value={img.tag}>{img.tag}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Notes */}
+                    <div className="p-2 w-64 shrink-0 border-r">
+                        <Input 
+                            id={`input-${i}-description`}
+                            value={item.description || ""}
+                            onChange={(e) => handleInputChange(i, "description", e.target.value)}
+                            className="h-9 w-full text-sm italic text-gray-500 disabled:opacity-100 disabled:bg-transparent disabled:border-none"
+                            placeholder={readOnly ? "" : "Detalles..."}
+                            disabled={readOnly}
+                        />
+                    </div>
+
+                    {/* Remove */}
+                    <div className="p-2 w-12 shrink-0 flex items-center justify-center">
+                        {!readOnly && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-red-500 hover:bg-red-50" onClick={() => removeRow(i)}>
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                        )}
+                    </div>
+                 </div>
+              ))}
+          </div>
+        </div>
       </div>
 
       {!readOnly && (

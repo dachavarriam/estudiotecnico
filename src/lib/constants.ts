@@ -7,7 +7,9 @@ export const NOCODB_TABLES = {
     study_comments: "mxwywcxq7otiomy",
     voice_notes: "m208gwjtim49z1u",
     supplies: "mlbjb58ncfdytw8",
-    users: "myyvu2xakmkxqz3"
+    users: "myyvu2xakmkxqz3",
+    study_versions: "mo5s6ro1l9jmkn4", 
+    study_followers: "mkke9u0hi7x1vej" 
 };
 
 export const STUDY_STATUS_MAP: Record<string, string> = {

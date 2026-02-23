@@ -1,0 +1,404 @@
+{
+  "database": "estudio_tecnico",
+  "description": "Sistema de estudios técnicos para TAS Honduras. Gestiona visitas técnicas, materiales, fotos, acciones, comentarios, notas de voz y versionamiento de estudios de seguridad tecnológica.",
+  "nocodb_base_id": "pqoiuan33cgquux",
+  "tables": {
+    "users": {
+      "table_id": "myyvu2xakmkxqz3",
+      "description": "Usuarios del sistema (ingenieros, técnicos, directores). Cada usuario puede crear estudios técnicos y seguir estudios de otros.",
+      "display_field": "email",
+      "fields": {
+        "Id": { "type": "ID", "description": "Autoincremental" },
+        "email": {
+          "type": "SingleLineText",
+          "description": "Email del usuario, campo principal de identificación"
+        },
+        "Name": { "type": "SingleLineText", "description": "Nombre completo" },
+        "Role": {
+          "type": "SingleLineText",
+          "description": "Rol en la empresa (ej: ingeniero, director)"
+        },
+        "Slack ID": {
+          "type": "SingleLineText",
+          "description": "ID de Slack para notificaciones"
+        }
+      },
+      "relations": {
+        "technical_studies_list": {
+          "type": "has_many",
+          "target": "technical_studies",
+          "description": "Estudios creados por este usuario"
+        },
+        "studies_link": {
+          "type": "has_many",
+          "target": "StudyFollowers",
+          "description": "Estudios que este usuario sigue"
+        }
+      }
+    },
+    "technical_studies": {
+      "table_id": "mxyg1dg5evhjdgl",
+      "description": "Tabla central. Cada registro es un estudio técnico de seguridad para un cliente. Contiene toda la información de la visita, planificación y categorización del proyecto.",
+      "display_field": "study_identifier",
+      "fields": {
+        "Id": { "type": "ID" },
+        "study_identifier": {
+          "type": "SingleLineText",
+          "description": "Identificador único del estudio (ej: ET-2025-001)"
+        },
+        "Client ID": {
+          "type": "SingleLineText",
+          "description": "ID del cliente en sistema externo (Odoo)"
+        },
+        "Client Name": {
+          "type": "SingleLineText",
+          "description": "Nombre del cliente"
+        },
+        "Status": {
+          "type": "SingleLineText",
+          "description": "Estado del estudio (ej: borrador, en revisión, aprobado, completado)"
+        },
+        "Date": {
+          "type": "SingleLineText",
+          "description": "Fecha de creación del estudio"
+        },
+        "PDF URL": {
+          "type": "SingleLineText",
+          "description": "URL al PDF generado del estudio"
+        },
+        "Location": {
+          "type": "SingleLineText",
+          "description": "Dirección o ubicación del sitio del cliente"
+        },
+        "Contact Info": {
+          "type": "SingleLineText",
+          "description": "Información de contacto del cliente para la visita"
+        },
+        "Study Type": {
+          "type": "SingleLineText",
+          "description": "Tipo de estudio técnico"
+        },
+        "Site Observations": {
+          "type": "SingleLineText",
+          "description": "Observaciones generales del sitio visitado"
+        },
+        "engineer_name": {
+          "type": "SingleLineText",
+          "description": "Nombre del ingeniero asignado"
+        },
+        "visit_type": {
+          "type": "SingleSelect",
+          "description": "Modalidad de la evaluación (Visita Técnica / Remoto/Plano)",
+          "options": ["Visita Técnica", "Remoto/Plano"]
+        },
+        "visit_date": {
+          "type": "DateTime",
+          "description": "Fecha y hora de la visita técnica"
+        },
+        "estimated_hours": {
+          "type": "Decimal",
+          "precision": 10,
+          "scale": 2,
+          "description": "Horas estimadas de trabajo para la instalación"
+        },
+        "estimated_technicians": {
+          "type": "Number",
+          "description": "Cantidad de técnicos necesarios para la instalación"
+        },
+        "schedule_type": {
+          "type": "SingleSelect",
+          "description": "Tipo de horario para la instalación (Ordinario / Extraordinario / Fin de Semana)",
+          "options": ["Ordinario", "Extraordinario", "Fin de Semana"]
+        },
+        "categories": {
+          "type": "MultiSelect",
+          "description": "Categorías de servicios incluidos (CCTV, Acceso, etc.)",
+          "options": [
+            "CCTV",
+            "Control de Acceso",
+            "Cableado Estructurado",
+            "Detección de Incendio",
+            "Alarma de Intrusión",
+            "Networking"
+          ]
+        },
+        "director_files": {
+          "type": "Attachment",
+          "description": "Archivos adjuntos del director (aprobaciones, documentos)"
+        },
+        "engineer_plans": {
+          "type": "Attachment",
+          "description": "Planos e imágenes técnicas del ingeniero"
+        }
+      },
+      "relations": {
+        "users": {
+          "type": "belongs_to",
+          "target": "users",
+          "fk": "users_id",
+          "description": "Usuario creador del estudio"
+        },
+        "study_materials_list": {
+          "type": "has_many",
+          "target": "study_materials",
+          "description": "Lista de materiales requeridos"
+        },
+        "study_photos_list": {
+          "type": "has_many",
+          "target": "study_photos",
+          "description": "Fotos del sitio"
+        },
+        "study_actions_list": {
+          "type": "has_many",
+          "target": "study_actions",
+          "description": "Acciones a realizar"
+        },
+        "study_comments_list": {
+          "type": "has_many",
+          "target": "study_comments",
+          "description": "Comentarios y observaciones"
+        },
+        "voice_notes_list": {
+          "type": "has_many",
+          "target": "voice_notes",
+          "description": "Notas de voz grabadas en campo"
+        },
+        "versions": {
+          "type": "has_many",
+          "target": "StudyVersions",
+          "description": "Historial de versiones del estudio"
+        },
+        "followers_link": {
+          "type": "has_many",
+          "target": "StudyFollowers",
+          "description": "Usuarios que siguen este estudio"
+        }
+      }
+    },
+    "study_materials": {
+      "table_id": "mfczeprv9lw8bwp",
+      "description": "Materiales y equipos requeridos para un estudio técnico. Cada material pertenece a una sección y categoría específica.",
+      "display_field": "item",
+      "fields": {
+        "Id": { "type": "ID" },
+        "item": {
+          "type": "SingleLineText",
+          "description": "Nombre del material o equipo"
+        },
+        "Quantity": {
+          "type": "SingleLineText",
+          "description": "Cantidad requerida"
+        },
+        "Unit": {
+          "type": "SingleLineText",
+          "description": "Unidad de medida (ej: unidades, metros, rollos)"
+        },
+        "Category": {
+          "type": "SingleLineText",
+          "description": "Categoría del material (ej: CCTV, Cableado)"
+        },
+        "Description": {
+          "type": "SingleLineText",
+          "description": "Descripción detallada o especificaciones"
+        },
+        "section": {
+          "type": "SingleLineText",
+          "description": "Sección o área del proyecto donde se usará"
+        }
+      },
+      "relations": {
+        "technical_studies": {
+          "type": "belongs_to",
+          "target": "technical_studies",
+          "fk": "technical_studies_id"
+        }
+      }
+    },
+    "study_photos": {
+      "table_id": "m3y0u65lc7pwwsv",
+      "description": "Fotografías tomadas durante la visita técnica, etiquetadas por ubicación o propósito.",
+      "display_field": "tag",
+      "fields": {
+        "Id": { "type": "ID" },
+        "tag": {
+          "type": "SingleLineText",
+          "description": "Etiqueta descriptiva de la foto (ej: entrada principal, cuarto de servidores)"
+        },
+        "Photo": {
+          "type": "SingleLineText",
+          "description": "Referencia o nombre del archivo de la foto"
+        },
+        "Photo URL": {
+          "type": "SingleLineText",
+          "description": "URL pública de la foto"
+        }
+      },
+      "relations": {
+        "technical_studies": {
+          "type": "belongs_to",
+          "target": "technical_studies",
+          "fk": "technical_studies_id"
+        }
+      }
+    },
+    "study_actions": {
+      "table_id": "ml1z4qub10s8v6o",
+      "description": "Acciones o tareas que se deben realizar como parte del estudio técnico.",
+      "display_field": "action",
+      "fields": {
+        "Id": { "type": "ID" },
+        "action": {
+          "type": "SingleLineText",
+          "description": "Descripción de la acción a realizar"
+        }
+      },
+      "relations": {
+        "technical_studies": {
+          "type": "belongs_to",
+          "target": "technical_studies",
+          "fk": "technical_studies_id"
+        }
+      }
+    },
+    "study_comments": {
+      "table_id": "mxwywcxq7otiomy",
+      "description": "Comentarios y observaciones adicionales sobre el estudio técnico.",
+      "display_field": "comment_summary",
+      "fields": {
+        "Id": { "type": "ID" },
+        "comment_summary": {
+          "type": "SingleLineText",
+          "description": "Resumen corto del comentario"
+        },
+        "Full Comment": {
+          "type": "SingleLineText",
+          "description": "Texto completo del comentario"
+        }
+      },
+      "relations": {
+        "technical_studies": {
+          "type": "belongs_to",
+          "target": "technical_studies",
+          "fk": "technical_studies_id"
+        }
+      }
+    },
+    "voice_notes": {
+      "table_id": "m208gwjtim49z1u",
+      "description": "Notas de voz grabadas en campo con su transcripción. Útil para capturar observaciones rápidas durante visitas.",
+      "display_field": "note_id",
+      "fields": {
+        "Id": { "type": "ID" },
+        "note_id": {
+          "type": "SingleLineText",
+          "description": "Identificador de la nota de voz"
+        },
+        "Transcription": {
+          "type": "SingleLineText",
+          "description": "Transcripción del audio a texto"
+        },
+        "Audio File": {
+          "type": "SingleLineText",
+          "description": "Referencia al archivo de audio"
+        },
+        "Audio URL": {
+          "type": "SingleLineText",
+          "description": "URL pública del archivo de audio"
+        }
+      },
+      "relations": {
+        "technical_studies": {
+          "type": "belongs_to",
+          "target": "technical_studies",
+          "fk": "technical_studies_id"
+        }
+      }
+    },
+    "supplies": {
+      "table_id": "mlbjb58ncfdytw8",
+      "description": "Catálogo maestro de suministros disponibles con precios. Tabla independiente, no vinculada directamente a estudios.",
+      "display_field": "name",
+      "fields": {
+        "Id": { "type": "ID" },
+        "name": {
+          "type": "SingleLineText",
+          "description": "Nombre del suministro"
+        },
+        "Price": { "type": "SingleLineText", "description": "Precio unitario" },
+        "Unit": { "type": "SingleLineText", "description": "Unidad de medida" },
+        "Category": {
+          "type": "SingleLineText",
+          "description": "Categoría del suministro"
+        }
+      },
+      "relations": {}
+    },
+    "StudyVersions": {
+      "table_id": "mo5s6ro1l9jmkn4",
+      "description": "Historial de versiones de un estudio. Cada versión guarda un snapshot completo del estado del estudio en un momento dado.",
+      "display_field": "version_name",
+      "fields": {
+        "Id": { "type": "ID" },
+        "version_name": {
+          "type": "SingleLineText",
+          "description": "Nombre de la versión (ej: v1.0, v2.0-revisión)"
+        },
+        "snapshot_data": {
+          "type": "LongText",
+          "description": "JSON con el snapshot completo del estudio en esta versión"
+        },
+        "created_by": {
+          "type": "SingleLineText",
+          "description": "Nombre de quien creó esta versión"
+        }
+      },
+      "relations": {
+        "technical_studies": {
+          "type": "belongs_to",
+          "target": "technical_studies",
+          "fk": "technical_studies_id"
+        }
+      }
+    },
+    "StudyFollowers": {
+      "table_id": "mkke9u0hi7x1vej",
+      "description": "Tabla puente many-to-many entre users y technical_studies. Permite que múltiples usuarios sigan un estudio para recibir actualizaciones.",
+      "display_field": "Id",
+      "fields": {
+        "Id": { "type": "ID" }
+      },
+      "relations": {
+        "technical_studies": {
+          "type": "belongs_to",
+          "target": "technical_studies",
+          "fk": "technical_studies_id"
+        },
+        "users": { "type": "belongs_to", "target": "users", "fk": "users_id" }
+      }
+    }
+  },
+  "relationship_map": {
+    "users → technical_studies": "1:N (un usuario crea muchos estudios)",
+    "users ↔ technical_studies via StudyFollowers": "N:N (muchos usuarios siguen muchos estudios)",
+    "technical_studies → study_materials": "1:N (un estudio tiene muchos materiales)",
+    "technical_studies → study_photos": "1:N (un estudio tiene muchas fotos)",
+    "technical_studies → study_actions": "1:N (un estudio tiene muchas acciones)",
+    "technical_studies → study_comments": "1:N (un estudio tiene muchas comentarios)",
+    "technical_studies → voice_notes": "1:N (un estudio tiene muchas notas de voz)",
+    "technical_studies → StudyVersions": "1:N (un estudio tiene muchas versiones)",
+    "supplies": "Tabla independiente (catálogo maestro de suministros)"
+  },
+  "business_context": {
+    "company": "TAS Honduras",
+    "domain": "Seguridad tecnológica",
+    "service_categories": [
+      "CCTV",
+      "Control de Acceso",
+      "Cableado Estructurado",
+      "Detección de Incendio",
+      "Alarma de Intrusión",
+      "Networking"
+    ],
+    "workflow": "Un ingeniero crea un estudio técnico tras visitar un cliente. Documenta materiales necesarios, toma fotos del sitio, registra acciones pendientes, agrega comentarios y notas de voz. El estudio pasa por versiones hasta ser aprobado y genera un PDF final."
+  }
+}

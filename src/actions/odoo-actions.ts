@@ -86,7 +86,7 @@ export async function getEmployees(query: string = '') {
         domain.push(['name', 'ilike', query]);
     }
 
-    const fields = ['id', 'name', 'work_email', 'job_title', 'department_id'];
+    const fields = ['id', 'name', 'work_email', 'job_title', 'department_id', 'work_location_id'];
     
     // Fetch from Odoo
     const employees = await odoo.searchRead('hr.employee', domain, fields, 20);
@@ -95,7 +95,8 @@ export async function getEmployees(query: string = '') {
     const formatted = employees.map((emp: any) => ({
         ...emp,
         name: toTitleCase(emp.name),
-        original_name: emp.name
+        original_name: emp.name,
+        location: emp.work_location_id ? emp.work_location_id[1] : 'Unknown' // Map location name
     }));
     
     return { success: true, data: formatted };

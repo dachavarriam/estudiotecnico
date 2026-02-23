@@ -29,7 +29,7 @@ interface Client {
 
 interface ClientSelectProps {
   value?: number
-  onSelect: (clientId: number) => void
+  onSelect: (clientId: number, clientName?: string) => void
 }
 
 export function ClientSelect({ value, onSelect }: ClientSelectProps) {
@@ -86,7 +86,7 @@ export function ClientSelect({ value, onSelect }: ClientSelectProps) {
                   key={client.id}
                   value={String(client.id)}
                   onSelect={(currentValue) => {
-                    onSelect(client.id)
+                    onSelect(client.id, client.name)
                     setOpen(false)
                   }}
                 >

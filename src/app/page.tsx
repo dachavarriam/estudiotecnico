@@ -1,5 +1,6 @@
-import { getSession } from '@/actions/user-actions';
+import { getSession, getAllUsers } from '@/actions/user-actions';
 import { LoginButton } from '@/components/login-button';
+import { MockAuthToggle } from '@/components/mock-auth-toggle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LogOut, LayoutDashboard } from 'lucide-react';
@@ -8,8 +9,12 @@ import { logout } from '@/actions/user-actions';
 
 export const dynamic = 'force-dynamic';
 
+const IS_MOCK_AUTH = process.env.MOCK_AUTH === 'true';
+
 export default async function Home() {
   const session = await getSession();
+  const usersRes = await getAllUsers();
+  const users = usersRes.success ? usersRes.data : [];
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gray-50 bg-[url('/grid.svg')]">
@@ -27,10 +32,17 @@ export default async function Home() {
                 <Card className="border-0 shadow-lg">
                     <CardHeader className="text-center pb-2">
                         <CardTitle>Bienvenido</CardTitle>
-                        <CardDescription>Inicia sesión con tu cuenta de TASHonduras (Slack)</CardDescription>
+                        <CardDescription>
+                            {IS_MOCK_AUTH 
+                                ? 'Modo Desarrollo: Selecciona un usuario para continuar' 
+                                : 'Inicia sesión con tu cuenta de TASHonduras (Slack)'}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <LoginButton />
+                        {IS_MOCK_AUTH 
+                            ? <MockAuthToggle users={users} />
+                            : <LoginButton />
+                        }
                     </CardContent>
                 </Card>
             </div>

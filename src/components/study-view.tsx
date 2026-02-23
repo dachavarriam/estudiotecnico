@@ -6,11 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Textarea } from '@/components/ui/textarea';
 import { AudioRecorder } from '@/components/audio-recorder';
 import { transcribeAudio, extractDataFromText } from '@/actions/voice-actions';
-import { Loader2, CheckCircle, Save, Plus, Trash2, Mic, FileText, Image as ImageIcon, Upload } from 'lucide-react';
+import { Loader2, CheckCircle, Save, Plus, Trash2, Mic, FileText, Image as ImageIcon, Upload, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { saveStudyDetails, uploadStudyImage } from '@/actions/study-actions';
+import { saveStudyDetails, uploadStudyImage, getStudyActivity, addStudyActivity, createStudyVersion, getStudyVersions, followStudy, unfollowStudy, checkIsFollowing } from '@/actions/study-actions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Bell, History, Check, ChevronsUpDown, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
 import { useRouter } from 'next/navigation';
 import { StudyItemsTable } from '@/components/study-items-table';
 import { STUDY_STATUS_MAP } from '@/lib/constants';
@@ -19,13 +25,16 @@ interface Note {
   id: string;
   transcription: string;
   timestamp: number;
+  file?: Blob;
+  isNew?: boolean;
+  audioUrl?: string;
 }
 
 interface ExtractedItem {
   item: string;
   quantity: number;
   unit?: string;
-  category?: 'equipment' | 'supply';
+  category?: 'equipment' | 'supply' | 'labor';
   relatedImageTag?: string;
   description?: string;
   // New pricing fields
@@ -44,30 +53,102 @@ interface SiteImage {
 
 // ... imports
 
-export function StudyView({ id, initialData, userRole }: { id: string, initialData: any, userRole: string }) {
+export function StudyView({ id, initialData, userRole, prevId, nextId, currentUser }: { id: string, initialData: any, userRole: string, prevId?: string, nextId?: string, currentUser?: any }) {
   // const { id } = use(params); // No longer needed
   
-  const [readOnly, setReadOnly] = useState(false);
-  
-  useEffect(() => {
-     // Director is always Read Only
-     // Approved/Rejected studies are Read Only for everyone? Maybe.
-     if (userRole === 'director') {
-         setReadOnly(true);
-     }
-  }, [userRole]);
+  // isEditMode and readOnly logic moved below status declaration
+
 
   const [notes, setNotes] = useState<Note[]>(initialData.notes || []); // Need to map this correctly if structure differs
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   
+  // Versions & Followers (Phase 5)
+  const [versions, setVersions] = useState<any[]>([]);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLinkId, setFollowLinkId] = useState<string | number | null>(null);
+  const [versionDialogOpen, setVersionDialogOpen] = useState(false);
+  const [newVersionName, setNewVersionName] = useState('');
+  
+  useEffect(() => {
+      // Load Meta (Follow status, Versions)
+      const loadMeta = async () => {
+          if (currentUser?.id) {
+             const fRes = await checkIsFollowing(id, currentUser.id);
+             setFollowLinkId(fRes.linkId);
+             setIsFollowing(!!fRes.isFollowing);
+          }
+          
+          const vRes = await getStudyVersions(id);
+          if (vRes.success) setVersions(vRes.data);
+      };
+      loadMeta();
+  }, [id, currentUser?.id]);
+
+  const handleFollowToggle = async () => {
+      setIsProcessing(true);
+      if (isFollowing && followLinkId) {
+          await unfollowStudy(followLinkId);
+          setIsFollowing(false);
+          setFollowLinkId(null);
+      } else if (currentUser?.id) {
+          await followStudy(id, currentUser.id);
+          setIsFollowing(true);
+          // Re-fetch to get ID? Or just assume true and next load gets ID. 
+          // Ideally fetch ID.
+          const fRes = await checkIsFollowing(id, currentUser.id);
+          setFollowLinkId(fRes.linkId);
+      }
+      setIsProcessing(false);
+  };
+
+  const handleCreateVersion = async () => {
+      if (!newVersionName.trim()) return;
+      setIsProcessing(true);
+      setStatusMessage('Guardando versión...');
+      
+      // Snapshot of current visual state (or initialData + current state changes)
+      // Best to save the *current state being edited*
+      const snapshot = {
+           materials, labor, actions, comments, images: images.map(i => i.tag), // Minimal ref
+           instructions, fieldNotes, visitDate, visitType, status: initialData.status
+      };
+      
+      const res = await createStudyVersion(id, newVersionName, snapshot, currentUser?.name);
+      if (res.success) {
+          setVersionDialogOpen(false);
+          setNewVersionName('');
+          // Refresh list
+          const vRes = await getStudyVersions(id);
+          if (vRes.success) setVersions(vRes.data);
+          alert('Versión guardada correctamente.');
+      } else {
+          alert('Error al guardar versión: ' + res.error);
+      }
+      setIsProcessing(false);
+  };
+  
   // Data
-  const [materials, setMaterials] = useState<ExtractedItem[]>(initialData.items || []);
+  const [materials, setMaterials] = useState<ExtractedItem[]>(initialData.items?.filter((i: any) => i.category !== 'labor') || []);
+  const [labor, setLabor] = useState<ExtractedItem[]>(initialData.items?.filter((i: any) => i.category === 'labor') || []);
+  
   const [actions, setActions] = useState<string[]>(initialData.actions || []);
   const [comments, setComments] = useState<string[]>(initialData.comments || []);
   
   const [status, setStatus] = useState(initialData.status || 'draft');
-  const [clientName, setClientName] = useState(initialData.client_name || 'Cliente General');
+  
+  const canEngineerEdit = userRole === 'engineer' && (initialData.status === 'draft' || initialData.status === 'in_progress');
+  const [isEditMode, setIsEditMode] = useState<boolean>(canEngineerEdit);
+  const effectiveReadOnly = !isEditMode;
+  
+  useEffect(() => {
+     if (userRole === 'engineer') {
+         setIsEditMode(status === 'draft' || status === 'in_progress');
+     } else if (userRole === 'director') {
+         setIsEditMode(false);
+     }
+  }, [status, userRole]);
+  const [clientName, setClientName] = useState(initialData.client_name || initialData.ClientName || 'Cliente General');
   
   // New Fields (Phase 2)
   const [location, setLocation] = useState(initialData.location || '');
@@ -89,8 +170,79 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
      }
   }, [initialData]);
 
-  const [studyType, setStudyType] = useState(initialData.study_type || 'Cableado Estructurado'); 
-  const [siteObservations, setSiteObservations] = useState(initialData.site_observations || '');
+  // New Fields (Phase 4)
+  const [visitDate, setVisitDate] = useState(initialData.visit_date || '');
+  const [visitType, setVisitType] = useState(initialData.visit_type || 'Visita Técnica');
+  const [directorFiles, setDirectorFiles] = useState(initialData.director_files || []);
+  const [engineerPlans, setEngineerPlans] = useState<any[]>(initialData.engineer_plans || []);
+  const [estimatedHours, setEstimatedHours] = useState(initialData.estimated_hours || '');
+  const [estimatedTechnicians, setEstimatedTechnicians] = useState(initialData.estimated_technicians || '');
+  const [estimatedEngineers, setEstimatedEngineers] = useState(initialData.estimated_engineers || '');
+  const [scheduleType, setScheduleType] = useState(initialData.schedule_type || 'Ordinario');
+
+  // Multi-select categories
+  const [openCategoryDropdown, setOpenCategoryDropdown] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+      initialData.categories 
+          ? (Array.isArray(initialData.categories) ? initialData.categories : initialData.categories.split(','))
+          : []
+  );
+
+  const toggleCategory = (cat: string) => {
+      setSelectedCategories(prev => 
+          prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+      );
+  };
+  
+  const CATEGORY_OPTIONS = ['Cableado Estructurado', 'CCTV', 'Control de Acceso', 'Detección de Incendio', 'Alarma de Intrusión', 'Fibra Óptica', 'Enlace Inalámbrico', 'Redes / Networking', 'Energía / UPS', 'Audio / Video', 'Automatización', 'Mantenimiento', 'Levantamiento General', 'Otro'];
+
+  // Separation of Instructions and Field Notes
+  const [instructions, setInstructions] = useState('');
+  const [fieldNotes, setFieldNotes] = useState('');
+
+  useEffect(() => {
+      const fullText = initialData.site_observations || initialData.SiteObservations || initialData['Site Observations'] || '';
+      
+      if (fullText.includes('Título:')) {
+          const parts = fullText.split('\n\n--- Notas de Campo ---\n');
+          setInstructions(parts[0]);
+          setFieldNotes(parts[1] || '');
+      } else {
+          // No standard header found, assuming all is field notes OR legacy instruction
+          setInstructions('');
+          setFieldNotes(fullText);
+      }
+  }, [initialData]);
+  
+  const plansInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePlanUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+          const newPlans = Array.from(e.target.files).map(file => ({
+              id: Date.now().toString() + Math.random(),
+              url: URL.createObjectURL(file), // For preview
+              title: file.name,
+              file: file, // Marker for upload
+              mimetype: file.type
+          }));
+          setEngineerPlans(prev => [...prev, ...newPlans]);
+      }
+  };
+
+  const directorFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDirectorFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+          const newFiles = Array.from(e.target.files).map(file => ({
+              id: Date.now().toString() + Math.random(),
+              url: URL.createObjectURL(file), // For preview
+              title: file.name,
+              file: file, // Marker for upload
+              mimetype: file.type
+          }));
+          setDirectorFiles((prev: any[]) => [...prev, ...newFiles]);
+      }
+  };
   
   // Fetch Data - REMOVED useEffect fetch, using initialData
 
@@ -105,9 +257,65 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
     const removeAction = (idx: number) => setActions(actions.filter((_, i) => i !== idx));
   
   // Images
-  const [images, setImages] = useState<SiteImage[]>([]);
+  const [images, setImages] = useState<SiteImage[]>(
+      (initialData.images || []).map((img: any, i: number) => ({
+          id: `past-image-${i}`,
+          tag: img.tag,
+          url: img.attachment_data, // Mapped to Proxy URL in getStudy
+          file: null
+      }))
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Activity / Chatter
+  const [activityLog, setActivityLog] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState('');
+  
+  useEffect(() => {
+      // Load initial activity
+      const loadActivity = async () => {
+          const res = await getStudyActivity(id);
+          if (res.success && res.data) {
+              setActivityLog(res.data);
+          }
+      };
+      loadActivity();
+  }, [id]);
+
+  const handleSendComment = async () => {
+      if (!newComment.trim()) return;
+      setIsProcessing(true);
+      try {
+          // Optimistic update
+          const tempId = Date.now();
+          const userName = currentUser?.name || 'Usuario';
+          
+          // Format message as it will be saved if we want consistent local display
+          // But for local state, we can keep structured
+          const tempMsg = { 
+              Id: tempId, 
+              full_comment: `[USER:${userName}] ${newComment}`, 
+              CreatedAt: new Date().toISOString(),
+              user_name: userName 
+          };
+          
+          setActivityLog(prev => [...prev, tempMsg]);
+          const commentToSend = newComment; // Keep ref before clearing
+          setNewComment('');
+          
+          const res = await addStudyActivity(id, commentToSend, 'comment', userName);
+          if (!res.success) {
+              // Revert if failed (complex, just alert for now)
+              alert('Falló el envío del comentario');
+          } else {
+              // Reload to get server timestamp/ID
+               const refresh = await getStudyActivity(id);
+               if(refresh.success) setActivityLog(refresh.data);
+          }
+      } catch (e) { console.error(e); }
+      setIsProcessing(false);
+  };
+  
   const handleRecordingComplete = async (blob: Blob) => {
     setIsProcessing(true);
     setStatusMessage('Transcribiendo audio...');
@@ -122,6 +330,8 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
         id: Date.now().toString(),
         transcription: res.text,
         timestamp: Date.now(),
+        file: blob,
+        isNew: true
       };
       
       setNotes((prev) => [...prev, newNote]);
@@ -191,40 +401,112 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
                 formData.append('file', img.file);
                 const res = await uploadStudyImage(formData);
                 if (res.success && res.data && res.data[0]) {
-                    // Start accumulating the attachment object or just the URL?
-                    // study_photos 'photo' column expects Attachment JSON
-                    // We'll pass the whole object to saveStudyDetails
                     uploadedImages.push({
                         tag: img.tag,
                         attachment_data: res.data // Array of attachments
                     });
                 }
+            }
+        }
+        
+        // 1.2 Upload Voice Notes Audio if any
+        const newVoiceNotes = [];
+        for (const note of notes) {
+             if (note.isNew) {
+                 if (note.file) {
+                     setStatusMessage('Subiendo audio...');
+                     const formData = new FormData();
+                     formData.append('file', note.file, 'audio.webm');
+                     const res = await uploadStudyImage(formData);
+                     if (res.success && res.data && res.data[0]) {
+                         // Fallback JSON URL or string mapping depending on structure
+                         note.audioUrl = JSON.stringify(res.data);
+                     }
+                 }
+                 newVoiceNotes.push(note);
+             }
+        }
+        
+        // 1.5 Upload Engineer Plans
+        const finalPlans = [];
+        // We need to keep existing plans (that don't have 'file') and add new ones (that have 'file')
+        // But 'saveStudyDetails' updates the 'engineer_plans' column which is an Attachment field.
+        // NocoDB Attachment update: we must provide the FULL list of attachments.
+        
+        for (const plan of engineerPlans) {
+            if (plan.file) {
+                 setStatusMessage(`Subiendo plano: ${plan.title}...`);
+                 const formData = new FormData();
+                 formData.append('file', plan.file);
+                 const res = await uploadStudyImage(formData);
+                 if (res.success && res.data && res.data[0]) {
+                     finalPlans.push(res.data[0]); // NocoDB returns array of attachment objects
+                 }
             } else {
-                 // Existing URL (if any logic needed)
+                // Existing plan (already an attachment object)
+                finalPlans.push(plan);
+            }
+        }
+
+        // 1.6 Upload Director Files
+        const finalDirectorFiles = [];
+        for (const fileObj of directorFiles) {
+            if (fileObj.file) {
+                 setStatusMessage(`Subiendo archivo de director: ${fileObj.title}...`);
+                 const formData = new FormData();
+                 formData.append('file', fileObj.file);
+                 const res = await uploadStudyImage(formData);
+                 if (res.success && res.data && res.data[0]) {
+                     finalDirectorFiles.push(res.data[0]); 
+                 }
+            } else {
+                finalDirectorFiles.push(fileObj);
             }
         }
 
         setStatusMessage('Guardando datos...');
 
         const combinedContact = contactName || contactPhone ? `${contactName} - ${contactPhone}` : contactInfo;
-
+        
         const studyData = {
-            materials,
+            materials: materials,
             actions,
             comments,
             images: uploadedImages,
-            notes, // Pass voice notes
+            notes: newVoiceNotes, // ONLY SEND NEW NOTES
             // New Fields
             location,
             contactInfo: combinedContact,
-            studyType,
-            siteObservations
+            categories: selectedCategories,
+            siteObservations: instructions 
+                ? `${instructions}\n\n--- Notas de Campo ---\n${fieldNotes}`
+                : fieldNotes,
+            engineerPlans: finalPlans,
+            directorFiles: finalDirectorFiles,
+            estimated_hours: estimatedHours,
+            estimated_technicians: estimatedTechnicians,
+            estimated_engineers: estimatedEngineers,
+            schedule_type: scheduleType
         };
 
         const res = await saveStudyDetails(id, studyData);
         
+        // Add Detailed Log
+        try {
+            const { addStudyActivity } = await import('@/actions/study-actions');
+            const details = [];
+            if (materials.length) details.push(`${materials.length} items`);
+            if (actions.length) details.push(`${actions.length} tareas`);
+            if (uploadedImages.length) details.push(`${uploadedImages.length} fotos nuevas`);
+            const detailsStr = details.length ? ` (${details.join(', ')})` : '';
+            await addStudyActivity(id, `Editó y guardó la información general del estudio${detailsStr}.`, 'comment', currentUser?.name);
+        } catch (e) {
+            console.error("No se pudo agregar el log de actividad", e);
+        }
+        
         if (res.success) {
-            alert('Estudio guardado exitosamente!');
+            setStatus('review'); // Optimistic UI update
+            alert('Estudio guardado y enviado para revisión exitosamente!');
             // router.push('/engineer/dashboard'); // Redirect or stay
         } else {
             alert('Error guardando: ' + res.error);
@@ -239,15 +521,41 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
   };
 
   const handleDownloadPDF = async () => {
+    setIsProcessing(true);
+    setStatusMessage('Generando PDF...');
+
+    const combinedContact = contactName || contactPhone ? `${contactName} - ${contactPhone}` : contactInfo;
+
     const pdfData = {
-        id: id,
-        client: 'Cliente Demo',
-        engineer: 'Ingeniero Demo',
-        date: new Date().toLocaleDateString(),
+        id: initialData.study_identifier || id,
+        client: initialData.client_name || 'Sin Cliente',
+        engineer: initialData.action_user || currentUser?.name || 'Ingeniero',
+        date: visitDate || new Date().toLocaleDateString(),
         materials,
         actions,
-        comments,
-        // images: images.map(img => ({ tag: img.tag, url: img.url })) // PDF needs update to handle images
+        comments: [], // Do not send audio-extracted comments to PDF as requested
+        location,
+        contact_info: combinedContact,
+        categories: selectedCategories,
+        site_observations: fieldNotes,
+        estimated_hours: String(estimatedHours),
+        estimated_engineers: String(estimatedEngineers),
+        estimated_technicians: String(estimatedTechnicians),
+        schedule_type: scheduleType,
+        visit_date: visitDate,
+        visit_type: visitType,
+        images: images.filter(img => img.url).map(img => ({
+            tag: img.tag,
+            url: img.url.startsWith('http') ? img.url : `${window.location.origin}${img.url}`
+        })),
+        engineer_plans: engineerPlans.map((p: any) => ({
+            title: p.title,
+            url: p.url?.startsWith('http') ? p.url : `${window.location.origin}${p.url}`
+        })),
+        director_files: directorFiles.map((p: any) => ({
+            title: p.title,
+            url: p.url?.startsWith('http') ? p.url : `${window.location.origin}${p.url}`
+        }))
     };
 
     try {
@@ -262,13 +570,15 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Estudio-${id}.pdf`;
+        a.download = `Estudio-${initialData.study_identifier || id}.pdf`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
     } catch (error) {
-        console.error(error);
-        alert('Error descargando PDF');
+        console.error('PDF error:', error);
+        alert('Error al generar PDF');
+    } finally {
+        setIsProcessing(false);
     }
   };
   
@@ -293,36 +603,155 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
       <div className="flex justify-between items-center mb-6">
         <div>
             <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">Estudio Técnico #{id}</h1>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide
-                    ${status === 'draft' ? 'bg-gray-200 text-gray-700' : ''}
-                    ${status === 'in_progress' ? 'bg-blue-100 text-blue-700' : ''}
-                    ${status === 'review' ? 'bg-yellow-100 text-yellow-800' : ''}
-                    ${status === 'approved' ? 'bg-green-100 text-green-800' : ''}
-                    ${status === 'rejected' ? 'bg-red-100 text-red-800' : ''}
-                `}>
-                    {STUDY_STATUS_MAP[status] || status || 'Borrador'}
-                </span>
+                <div className="flex bg-white rounded-md border shadow-sm mr-2">
+                    <Link href={userRole === 'director' ? '/dashboard' : '/engineer/dashboard'}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 border-r rounded-none hover:bg-gray-50" title="Volver al Dashboard">
+                            <ArrowLeft className="w-4 h-4" />
+                        </Button>
+                    </Link>
+
+                </div>
+                <div>
+                    <h1 className="text-xl font-bold leading-none">{initialData.study_identifier || `Estudio #${id}`}</h1>
+                    <span className="text-xs text-gray-400 font-mono">ID: {id}</span>
+                </div>
             </div>
-            <p className="text-gray-500">{clientName}</p>
+            <p className="text-gray-800 ml-[104px] mt-1"><span className="font-bold">Cliente:</span> {clientName}</p>
         </div>
-        <div className="flex gap-2">
-             {!readOnly && status === 'draft' && (
+        <div className="flex gap-2 items-center">
+             {/* Versions & Follow Actions */}
+             <div className="flex gap-1 mr-2 border-r pr-3">
+                 <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className={isFollowing ? "text-blue-600 bg-blue-50" : "text-gray-400"}
+                    onClick={handleFollowToggle}
+                    title={isFollowing ? "Dejar de seguir" : "Seguir estudio"}
+                 >
+                     <Bell className={`w-4 h-4 ${isFollowing ? "fill-current" : ""}`} />
+                 </Button>
+                 
+                 <Dialog open={versionDialogOpen} onOpenChange={setVersionDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="text-gray-500 hover:text-blue-600" title="Guardar Versión / Historial">
+                            <History className="w-4 h-4" />
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Versiones del Estudio</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input 
+                                    placeholder="Nombre de nueva versión (ej. 'Revisión Cliente')" 
+                                    value={newVersionName}
+                                    onChange={(e) => setNewVersionName(e.target.value)}
+                                />
+                                <Button onClick={handleCreateVersion} disabled={isProcessing}>
+                                    <Check className="w-4 h-4 mr-2"/> Guardar
+                                </Button>
+                            </div>
+                            
+                            <div className="max-h-[300px] overflow-y-auto border rounded p-2 bg-gray-50">
+                                <h4 className="text-sm font-bold text-gray-700 mb-2">Historial</h4>
+                                {versions.length === 0 && <p className="text-xs text-gray-400">No hay versiones guardadas.</p>}
+                                {versions.map((v: any, i) => (
+                                    <div key={i} className="flex justify-between items-center p-2 border-b last:border-0 bg-white hover:bg-slate-50 text-sm">
+                                        <div>
+                                            <div className="font-bold">{v.version_name}</div>
+                                            <div className="text-xs text-gray-500">
+                                                {new Date(v.CreatedAt).toLocaleString()} - {v.created_by}
+                                            </div>
+                                        </div>
+                                        {/* Restore logic could go here later */}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </DialogContent>
+                 </Dialog>
+             </div>
+
+             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide mr-2
+                ${status === 'draft' ? 'bg-gray-200 text-gray-700' : ''}
+                ${status === 'in_progress' ? 'bg-blue-100 text-blue-700' : ''}
+                ${status === 'review' ? 'bg-yellow-100 text-yellow-800' : ''}
+                ${status === 'approved' ? 'bg-green-100 text-green-800' : ''}
+                ${status === 'rejected' ? 'bg-red-100 text-red-800' : ''}
+            `}>
+                {STUDY_STATUS_MAP[status] || status || 'Borrador'}
+            </span>
+
+             {userRole === 'director' && !isEditMode && status !== 'approved' && (
+                 <Button size="sm" variant="secondary" onClick={() => setIsEditMode(true)}>
+                     Editar Estudio
+                 </Button>
+             )}
+
+             {userRole === 'director' && isEditMode && (
+                 <Button size="sm" onClick={handleSaveStudy} disabled={isProcessing}>
+                     <Save className="w-4 h-4 mr-2" /> Guardar Cambios Previos
+                 </Button>
+             )}
+             
+             {userRole === 'director' && status === 'review' && (
+                 <>
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={async () => {
+                        if(!confirm('¿Aprobar este estudio técnico?')) return;
+                        setIsProcessing(true);
+                        try {
+                            const { saveStudyDetails, addStudyActivity } = await import('@/actions/study-actions');
+                            await saveStudyDetails(id, { ...initialData, status: 'approved' }); // minimal save to trigger status
+                            // Actually wait, saveStudyDetails forces 'review'. Let's use nocodb directly here for simplicity, or just update the status logic.
+                            const { nocodb } = await import('@/lib/nocodb');
+                            const { NOCODB_TABLES } = await import('@/lib/constants');
+                            await nocodb.update(NOCODB_TABLES.technical_studies, id, { 'Status': 'approved', approved_at: new Date().toISOString() });
+                            await addStudyActivity(id, '[SYSTEM] Estudio Aprobado por el Director.', 'log');
+                            setStatus('approved');
+                            setIsEditMode(false);
+                        } catch(e) { alert('Error al aprobar'); }
+                        setIsProcessing(false);
+                    }}>
+                        <CheckCircle className="w-4 h-4 mr-2" /> Aprobar
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={async () => {
+                        if(!confirm('¿Devolver este estudio al ingeniero?')) return;
+                        setIsProcessing(true);
+                        try {
+                            const { nocodb } = await import('@/lib/nocodb');
+                            const { NOCODB_TABLES } = await import('@/lib/constants');
+                            const { addStudyActivity } = await import('@/actions/study-actions');
+                            await nocodb.update(NOCODB_TABLES.technical_studies, id, { 'Status': 'in_progress' });
+                            await addStudyActivity(id, '[SYSTEM] Estudio devuelto para correcciones.', 'log');
+                            setStatus('in_progress');
+                        } catch(e) { alert('Error al devolver'); }
+                        setIsProcessing(false);
+                    }}>
+                        Devolver
+                    </Button>
+                 </>
+             )}
+
+             {!effectiveReadOnly && status === 'draft' && userRole === 'engineer' && (
                 <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={async () => {
-                    if(!confirm('¿Iniciar levantamiento en sitio? Esto marcará la hora de inicio.')) return;
+                    if(!confirm('¿Iniciar levantamiento en sitio? Esto marcará la hora de inicio y habilitará el envío.')) return;
                     setIsProcessing(true);
                     try {
                         const { startStudy } = await import('@/actions/study-actions');
                         const res = await startStudy(id);
-                        if(res.success) { setStatus('in_progress'); alert('Iniciado correctamente.'); }
+                        if(res.success) { 
+                            setStatus('in_progress'); 
+                            alert('Iniciado correctamente. Ahora puedes editar y enviar el estudio.'); 
+                        }
                     } catch(e) { alert('Error al iniciar'); }
                     setIsProcessing(false);
                 }}>
-                    <CheckCircle className="w-4 h-4 mr-2" /> Iniciar
+                    <CheckCircle className="w-4 h-4 mr-2" /> Iniciar Levantamiento
                 </Button>
              )}
              
-             {!readOnly && <Button size="sm" variant="ghost" className="text-blue-600" onClick={loadDemoData}>Demo</Button>}
+             {!effectiveReadOnly && <Button size="sm" variant="ghost" className="text-blue-600" onClick={loadDemoData}>Demo</Button>}
              
              <Button size="sm" variant="outline" onClick={() => {
                 const headers = ['Item', 'Descripción', 'Cantidad', 'Unidad', 'Categoría', 'Precio'];
@@ -334,7 +763,7 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
                     m.category,
                     m.price
                 ]);
-                const csvContent = [headers.join(','), ...rows.map((r: any[]) => r.join(','))].join('\n');
+                const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r: any[]) => r.join(','))].join('\n');
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
@@ -347,11 +776,38 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
                 <FileText className="w-4 h-4 mr-2" /> Excel/CSV
              </Button>
 
-             <Button size="sm" variant="outline" onClick={handleDownloadPDF}><FileText className="w-4 h-4 mr-2" /> PDF</Button>
+
+             <Button size="sm" variant="outline" onClick={handleDownloadPDF} disabled={isProcessing}><FileText className="w-4 h-4 mr-2" /> PDF / Imprimir</Button>
              
-             {!readOnly && (status === 'in_progress' || status === 'draft') && (
+             {/* Navigation */}
+             <div className="flex bg-white rounded-md border shadow-sm ml-2">
+                 {prevId ? (
+                    <Link href={`/engineer/study/${prevId}`}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 border-r rounded-none hover:bg-gray-50" title="Estudio Anterior">
+                            <span className="text-xs font-bold">←</span>
+                        </Button>
+                    </Link>
+                 ) : (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-300 border-r rounded-none" disabled>
+                        <span className="text-xs font-bold">←</span>
+                    </Button>
+                 )}
+                 {nextId ? (
+                    <Link href={`/engineer/study/${nextId}`}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 rounded-none hover:bg-gray-50" title="Siguiente Estudio">
+                            <span className="text-xs font-bold">→</span>
+                        </Button>
+                    </Link>
+                 ) : (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-300 rounded-none" disabled>
+                        <span className="text-xs font-bold">→</span>
+                    </Button>
+                 )}
+             </div>
+
+             {!effectiveReadOnly && status === 'in_progress' && userRole === 'engineer' && (
                  <Button size="sm" onClick={handleSaveStudy}>
-                    <Save className="w-4 h-4 mr-2" /> Guardar y Enviar
+                    <Save className="w-4 h-4 mr-2" /> Guardar y Enviar a Revisión
                  </Button>
              )}
         </div>
@@ -372,45 +828,118 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
                     <CardTitle className="text-lg flex items-center"><FileText className="w-5 h-5 mr-2 text-blue-600"/> General</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {instructions && (
+                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-900 mb-4">
+                            <h4 className="font-bold flex items-center mb-1"><FileText className="w-4 h-4 mr-2"/> Instrucciones / Asignación</h4>
+                            <div className="whitespace-pre-line pl-6 mb-2">
+                                {instructions}
+                            </div>
+                            
+                            {/* Director Meta Data */}
+                            <div className="mt-3 pt-3 border-t border-blue-200 grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                    <span className="font-bold text-blue-800 block">Tipo:</span>
+                                    {visitType}
+                                </div>
+                                <div>
+                                    <span className="font-bold text-blue-800 block">Fecha Programada:</span>
+                                    {visitDate ? new Date(visitDate).toLocaleString() : 'No definida'}
+                                </div>
+                            </div>
+                            
+                        </div>
+                    )}
+
                     <div className="space-y-2">
                         <label className="text-xs font-bold uppercase text-gray-500">Ubicación / Sitio</label>
-                        <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ej: San Pedro Sula, Planta 2" disabled={readOnly} />
+                        <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ej: San Pedro Sula, Planta 2" disabled={effectiveReadOnly} />
                     </div>
                     <div className="space-y-2">
                             <label className="text-xs font-bold uppercase text-gray-500">Contacto en Sitio</label>
-                            <Input value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} placeholder="Nombre y Teléfono" disabled={readOnly} />
+                            <Input value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} placeholder="Nombre y Teléfono" disabled={effectiveReadOnly} />
                     </div>
                     <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase text-gray-500">Categoría</label>
-                            <Select value={studyType} onValueChange={setStudyType} disabled={readOnly}>
-                            <SelectTrigger disabled={readOnly}><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Cableado Estructurado">Cableado Estructurado</SelectItem>
-                                <SelectItem value="CCTV">CCTV</SelectItem>
-                                <SelectItem value="Control de Acceso">Control de Acceso</SelectItem>
-                                <SelectItem value="Detección de Incendio">Detección de Incendio</SelectItem>
-                                <SelectItem value="Alarma de Intrusión">Alarma de Intrusión</SelectItem>
-                                <SelectItem value="Fibra Óptica">Fibra Óptica</SelectItem>
-                                <SelectItem value="Enlace Inalámbrico">Enlace Inalámbrico</SelectItem>
-                                <SelectItem value="Redes / Networking">Redes / Networking</SelectItem>
-                                <SelectItem value="Energía / UPS">Energía / UPS</SelectItem>
-                                <SelectItem value="Audio / Video">Audio / Video</SelectItem>
-                                <SelectItem value="Automatización">Automatización</SelectItem>
-                                <SelectItem value="Mantenimiento">Mantenimiento</SelectItem>
-                                <SelectItem value="Levantamiento General">Levantamiento General</SelectItem>
-                                <SelectItem value="Otro">Otro</SelectItem>
-                            </SelectContent>
-                            </Select>
+                        <label className="text-xs font-bold uppercase text-gray-500">Categorías (Múltiple Selección)</label>
+                        <Popover open={openCategoryDropdown} onOpenChange={setOpenCategoryDropdown}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={openCategoryDropdown}
+                                    className="w-full justify-between font-normal h-auto min-h-10 text-left"
+                                    disabled={effectiveReadOnly}
+                                >
+                                    <div className="flex flex-wrap gap-1 items-center">
+                                        {selectedCategories.length === 0 && <span className="text-gray-500">Seleccione categorías...</span>}
+                                        {selectedCategories.map((cat) => (
+                                            <Badge key={cat} variant="secondary" className="mr-1 mb-1">
+                                                {cat}
+                                                {!effectiveReadOnly && (
+                                                <div
+                                                    className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-red-100 hover:text-red-500 cursor-pointer"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") {
+                                                            toggleCategory(cat);
+                                                        }
+                                                    }}
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        toggleCategory(cat);
+                                                    }}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </div>
+                                                )}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[400px] p-0" align="start">
+                                <Command>
+                                    <CommandInput placeholder="Buscar categoría..." />
+                                    <CommandList>
+                                        <CommandEmpty>No se encontró la categoría.</CommandEmpty>
+                                        <CommandGroup>
+                                            {CATEGORY_OPTIONS.map((cat) => (
+                                                <CommandItem
+                                                    key={cat}
+                                                    value={cat}
+                                                    onSelect={() => {
+                                                        toggleCategory(cat);
+                                                    }}
+                                                >
+                                                    <Check
+                                                        className={`mr-2 h-4 w-4 ${
+                                                            selectedCategories.includes(cat) ? "opacity-100" : "opacity-0"
+                                                        }`}
+                                                    />
+                                                    {cat}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                     </div>
+
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase text-gray-500">Observaciones</label>
+                        <label className="text-xs font-bold uppercase text-gray-500">Notas de Campo / Observaciones</label>
                         <Textarea 
-                            value={siteObservations} 
-                            onChange={(e) => setSiteObservations(e.target.value)} 
+                            value={fieldNotes} 
+                            onChange={(e) => setFieldNotes(e.target.value)} 
                             placeholder="Notas generales..." 
                             className="h-24 resize-none"
-                            disabled={readOnly}
+                            disabled={effectiveReadOnly}
                         />
+                         <p className="text-[10px] text-gray-400">Puede agregar notas adicionales aquí abajo.</p>
                     </div>
                 </CardContent>
             </Card>
@@ -418,16 +947,24 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
             <Card className="border-blue-100 shadow-sm h-full">
                 <CardHeader className="pb-2"> <CardTitle className="text-lg flex items-center"><Mic className="w-5 h-5 mr-2 text-red-500"/> Notas de Voz</CardTitle> </CardHeader>
                 <CardContent className="flex flex-col items-center pt-4 gap-4">
-                    {!readOnly && <AudioRecorder onRecordingComplete={handleRecordingComplete} />}
+                    {!effectiveReadOnly && <AudioRecorder onRecordingComplete={handleRecordingComplete} />}
                     
                     <div className="w-full space-y-2 max-h-[300px] overflow-y-auto">
                         {notes.map((note) => (
-                        <div key={note.id} className="bg-white border rounded p-3 text-sm flex gap-2 group">
-                            <p className="flex-1 text-gray-700">"{note.transcription}"</p>
-                            {!readOnly && (
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 group-hover:text-red-500" onClick={() => handleDeleteNote(note.id)}>
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
+                        <div key={note.id} className="bg-white border rounded p-3 text-sm flex gap-2 group flex-col">
+                            <div className="flex justify-between items-start gap-2">
+                                <p className="flex-1 text-gray-700">"{note.transcription}"</p>
+                                {!effectiveReadOnly && (
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 group-hover:text-red-500 shrink-0" onClick={() => handleDeleteNote(note.id)}>
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                )}
+                            </div>
+                            {note.audioUrl && (
+                                <audio controls src={note.audioUrl} className="h-8 mt-2 w-full" />
+                            )}
+                            {note.file && !note.audioUrl && (
+                                <audio controls src={URL.createObjectURL(note.file)} className="h-8 mt-2 w-full" />
                             )}
                         </div>
                         ))}
@@ -442,7 +979,9 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
             <Tabs defaultValue="items" className="w-full">
                 <TabsList className="mb-4">
                 <TabsTrigger value="items" className="flex-1"> <FileText className="w-4 h-4 mr-2"/> Equipos y Suministros</TabsTrigger>
+                <TabsTrigger value="plans" className="flex-1"> <FileText className="w-4 h-4 mr-2"/> Documentos</TabsTrigger>
                 <TabsTrigger value="images" className="flex-1"> <ImageIcon className="w-4 h-4 mr-2"/> Fotografías ({images.length})</TabsTrigger>
+                <TabsTrigger value="activity" className="flex-1"> <FileText className="w-4 h-4 mr-2"/> Actividad</TabsTrigger>
                 </TabsList>
                 
                 {/* ITEMS TAB */}
@@ -456,15 +995,62 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
                         items={materials} 
                         setItems={setMaterials} 
                         images={images.map(img => ({ id: img.id, tag: img.tag }))} 
-                        readOnly={readOnly}
+                        readOnly={effectiveReadOnly}
                     />
+                    
+                    <div className="mt-8 bg-slate-50 border rounded-lg p-4">
+                        <h3 className="text-md font-bold text-gray-700 mb-4 flex items-center">
+                            <FileText className="w-4 h-4 mr-2" /> Estimación de Mano de Obra
+                        </h3>
+                        {/* Engineer Input Fields for Labor */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold uppercase text-gray-500">Cantidad Ingenieros</label>
+                                <Input type="number" min="0" value={estimatedEngineers} onChange={e => setEstimatedEngineers(e.target.value)} disabled={effectiveReadOnly && status !== 'draft' && status !== 'in_progress'} className="bg-white"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold uppercase text-gray-500">Cantidad Técnicos</label>
+                                <Input type="number" min="0" value={estimatedTechnicians} onChange={e => setEstimatedTechnicians(e.target.value)} disabled={effectiveReadOnly && status !== 'draft' && status !== 'in_progress'} className="bg-white"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold uppercase text-gray-500">Tiempo Estimado (Hrs/Días)</label>
+                                <Input type="text" placeholder="Ej: 40 horas" value={estimatedHours} onChange={e => setEstimatedHours(e.target.value)} disabled={effectiveReadOnly && status !== 'draft' && status !== 'in_progress'} className="bg-white"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold uppercase text-gray-500">Horario de Trabajo</label>
+                                <Select value={scheduleType} onValueChange={setScheduleType} disabled={effectiveReadOnly && status !== 'draft' && status !== 'in_progress'}>
+                                    <SelectTrigger className="bg-white"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Ordinario">Ordinario</SelectItem>
+                                        <SelectItem value="Extraordinario">Extraordinario</SelectItem>
+                                        <SelectItem value="Mixto">Mixto</SelectItem>
+                                        <SelectItem value="Fin de Semana">Fin de Semana</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        {/* Director Labor Calculation Table */}
+                        {userRole === 'director' && (
+                            <div>
+                                <h4 className="text-sm font-bold text-gray-600 mb-2 uppercase border-b pb-1">Cálculo de Costo de Mano de Obra</h4>
+                                <StudyItemsTable 
+                                    items={labor} 
+                                    setItems={setLabor} 
+                                    images={[]} 
+                                    readOnly={effectiveReadOnly}
+                                    defaultCategory="labor"
+                                />
+                            </div>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
             
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between py-3">
-                    <CardTitle className="text-sm font-medium">Acciones / Tareas</CardTitle>
-                    {!readOnly && <Button variant="ghost" size="sm" onClick={addAction}><Plus className="w-3 h-3"/></Button>}
+                    <CardTitle className="text-sm font-medium">Checklist / Tareas</CardTitle>
+                    {!effectiveReadOnly && <Button variant="ghost" size="sm" onClick={addAction}><Plus className="w-3 h-3"/></Button>}
                 </CardHeader>
                 <CardContent className="p-0">
                     <ul className="divide-y relative">
@@ -475,9 +1061,9 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
                                     onChange={(e) => updateAction(i, e.target.value)}
                                     className="h-7 text-sm border-transparent focus:border-blue-200 bg-transparent disabled:opacity-100"
                                     placeholder="Nueva tarea..."
-                                    disabled={readOnly}
+                                    disabled={effectiveReadOnly}
                                 />
-                                {!readOnly && (
+                                {!effectiveReadOnly && (
                                     <Button 
                                         variant="ghost" 
                                         size="icon" 
@@ -495,13 +1081,102 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
             </Card>
         </TabsContent>
 
+        {/* PLANS TAB */}
+        <TabsContent value="plans" className="space-y-4">
+             <div className="space-y-2">
+                 {engineerPlans.map((plan, idx) => (
+                     <div key={idx} className="flex items-center justify-between p-3 bg-white border rounded shadow-sm">
+                         <div className="flex items-center">
+                             <FileText className="w-5 h-5 text-blue-500 mr-3" />
+                             <div>
+                                 <a href={plan.url} target="_blank" className="font-medium text-sm text-blue-700 hover:underline">{plan.title}</a>
+                                 <p className="text-xs text-gray-400">{plan.file ? 'Pendiente de subida' : 'Guardado'}</p>
+                             </div>
+                         </div>
+                         {!effectiveReadOnly && (
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-red-500 hover:bg-red-50"
+                                onClick={() => setEngineerPlans(prev => prev.filter((_, i) => i !== idx))}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                         )}
+                     </div>
+                 ))}
+                 
+         {engineerPlans.length === 0 && <p className="text-sm text-gray-400 italic">No hay planos adjuntos.</p>}
+             </div>
+             
+             {userRole === 'engineer' && !effectiveReadOnly && (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 bg-white mt-4" onClick={() => plansInputRef.current?.click()}>
+                    <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500">Subir Plano (Ingeniero)</p>
+                    <input 
+                        type="file" 
+                        multiple
+                        ref={plansInputRef} 
+                        onChange={handlePlanUpload} 
+                        className="hidden" 
+                    />
+                </div>
+             )}
+
+             <h4 className="font-bold text-gray-700 mt-6 pt-4 border-t">Archivos Administrativos (Director)</h4>
+             <div className="space-y-2">
+                 {directorFiles.map((fileObj: any, idx: number) => (
+                     <div key={`dir-${idx}`} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded shadow-sm">
+                         <div className="flex items-center">
+                             <FileText className="w-5 h-5 text-blue-600 mr-3" />
+                             <div>
+                                 <a href={fileObj.url} target="_blank" className="font-medium text-sm text-blue-800 hover:underline">{fileObj.title}</a>
+                                 <p className="text-xs text-blue-500">{fileObj.file ? 'Pendiente de subida' : 'Guardado'}</p>
+                             </div>
+                         </div>
+                         {userRole === 'director' && (
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-red-500 hover:bg-red-100"
+                                onClick={() => setDirectorFiles((prev: any[]) => prev.filter((_: any, i: number) => i !== idx))}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                         )}
+                     </div>
+                 ))}
+                 
+                 {directorFiles.length === 0 && <p className="text-sm text-gray-400 italic">No hay archivos administrativos.</p>}
+             </div>
+
+             {userRole === 'director' && (
+                <div className="border-2 border-dashed border-blue-200 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 bg-white mt-4" onClick={() => directorFileInputRef.current?.click()}>
+                    <Upload className="w-8 h-8 text-blue-400 mb-2" />
+                    <p className="text-sm text-blue-600 font-medium">Subir Documento PDF / Referencia</p>
+                    <input 
+                        type="file" 
+                        multiple
+                        ref={directorFileInputRef} 
+                        onChange={handleDirectorFileUpload} 
+                        className="hidden" 
+                    />
+                </div>
+             )}
+
+        </TabsContent>
+
         {/* IMAGES TAB */}
         <TabsContent value="images" className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {images.map((img, i) => (
                     <div key={img.id} className="relative group">
-                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-2 border">
-                            <img src={img.url} alt={img.tag} className="w-full h-full object-cover" />
+                        <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden mb-2 border text-center">
+                            {img.url ? (
+                                <img src={img.url} alt={img.tag} className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-[10px] text-red-400 p-2 font-mono">Enlace roto<br/>(Datos heredados)</span>
+                            )}
                         </div>
                         <Input 
                             value={img.tag} 
@@ -511,9 +1186,9 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
                                 setImages(newImgs);
                             }}
                             className="h-8 text-xs text-center font-bold bg-white disabled:opacity-100 disabled:border-none" 
-                            disabled={readOnly}
+                            disabled={effectiveReadOnly}
                         />
-                        {!readOnly && (
+                        {!effectiveReadOnly && (
                             <Button 
                                 variant="destructive" 
                                 size="icon" 
@@ -528,7 +1203,7 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
                 ))}
             </div>
             
-            {!readOnly && (
+            {!effectiveReadOnly && (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 bg-white" onClick={() => fileInputRef.current?.click()}>
                     <Upload className="w-8 h-8 text-gray-400 mb-2" />
                     <p className="text-sm text-gray-500">Subir Foto o Tomar</p>
@@ -542,6 +1217,66 @@ export function StudyView({ id, initialData, userRole }: { id: string, initialDa
                     />
                 </div>
             )}
+        </TabsContent>
+        {/* ACTIVITY TAB */}
+        <TabsContent value="activity" className="space-y-4">
+             <Card>
+                 <CardHeader className="pb-2"><CardTitle className="text-lg">Historial y Comentarios</CardTitle></CardHeader>
+                 <CardContent>
+                     <div className="space-y-4 max-h-[400px] overflow-y-auto mb-4 p-2 border rounded bg-gray-50">
+                         {activityLog.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Sin actividad registrada.</p>}
+                         {activityLog.map((log: any, i) => {
+                             // Robust key access
+                             let displayMsg = log['Full Comment'] || log.full_comment || log.FullComment || log.comment || '';
+                             let displayUser = log.user_name || 'Usuario';
+                             let isSystem = false;
+                             
+                             if (displayMsg?.startsWith('[SYSTEM]')) {
+                                 isSystem = true;
+                                 displayUser = 'Sistema';
+                                 displayMsg = displayMsg.replace('[SYSTEM] ', '');
+                             } else if (displayMsg?.startsWith('[USER:')) {
+                                 // Extract User
+                                 const match = displayMsg.match(/^\[USER:(.*?)\] (.*)/);
+                                 if (match) {
+                                     displayUser = match[1];
+                                     displayMsg = match[2];
+                                 }
+                             }
+                             
+                             return (
+                             <div key={i} className={`flex gap-3 text-sm ${isSystem ? 'opacity-75' : ''}`}>
+                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0
+                                     ${isSystem ? 'bg-gray-200 text-gray-600' : 'bg-blue-100 text-blue-700'}`}>
+                                     {isSystem ? 'SYS' : displayUser[0].toUpperCase()}
+                                 </div>
+                                 <div className="flex-1">
+                                      <div className="flex justify-between items-baseline">
+                                          <span className="font-bold text-gray-800">{displayUser}</span>
+                                          <span className="text-[10px] text-gray-400">{new Date(log.CreatedAt).toLocaleString()}</span>
+                                      </div>
+                                      <p className="text-gray-700 mt-1 whitespace-pre-wrap">
+                                          {displayMsg}
+                                      </p>
+                                 </div>
+                             </div>
+                             );
+                         })}
+                     </div>
+                     
+                     <div className="flex gap-2 items-start">
+                         <div className="flex-1">
+                             <Textarea 
+                                 value={newComment}
+                                 onChange={(e) => setNewComment(e.target.value)}
+                                 placeholder="Escribe un comentario..."
+                                 className="min-h-[80px]"
+                             />
+                         </div>
+                         <Button onClick={handleSendComment} className="h-[80px]">Enviar</Button>
+                     </div>
+                 </CardContent>
+             </Card>
         </TabsContent>
             </Tabs>
         </div>
