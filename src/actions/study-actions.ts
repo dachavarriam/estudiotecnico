@@ -476,33 +476,55 @@ export async function getAllStudies() {
 
 export async function getEngineerStudies(engineerId: string) {
     try {
-        let whereClause = '';
+        // Helper: strip accents and lowercase for comparison
+        const normalize = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : '';
 
-        // 1. Resolve Slack ID to Internal ID
+        // 1. Resolve session ID to user record
         const { getUserBySlackId } = await import('@/actions/user-actions');
         const uRes = await getUserBySlackId(engineerId);
         
+        let internalId: number | null = null;
+        let normalizedName = '';
+
         if (uRes.success && uRes.data) {
-            const internalId = uRes.data.Id;
-            const userName = uRes.data.Name || uRes.data.name;
-            // Match either by internal ID OR by Engineer Name text since 
-            // the system allows creating studies with engineers that aren't properly linked in users table yet
-            whereClause = `(users_id,eq,${internalId})~or(engineer_name,like,%${userName}%)`; 
+            internalId = uRes.data.Id;
+            normalizedName = normalize(uRes.data.Name || uRes.data.name || '');
         } else {
-            // Engineer not found as object, fallback to text query using the session ID (which might just be their name from older sessions)
-            whereClause = `(engineer_name,like,%${engineerId}%)`;
+            // Fallback: use the engineerId itself as a name search
+            normalizedName = normalize(engineerId);
         }
 
+        // 2. Fetch ALL studies and filter in-memory
+        // NocoDB's `like` is accent-sensitive, so "López" won't match "LOPEZ".
+        // With small datasets (<500), in-memory filtering is fast and reliable.
         const result = await nocodb.list(NOCODB_TABLES.technical_studies, {
-             sort: '-CreatedAt', 
-             where: whereClause
+             sort: '-CreatedAt',
+             limit: 500
         }) as any;
 
-        const list = result.list || result || [];
+        const allStudies = result.list || result || [];
+
+        // 3. Filter: match by linked user ID OR by normalized engineer name
+        const filtered = allStudies.filter((s: any) => {
+            // Match by linked user record
+            if (internalId && (s.users_id === internalId || s.users === internalId)) {
+                return true;
+            }
+            // Match by engineer_name text (accent & case insensitive)
+            const studyEngineer = normalize(s.engineer_name || s.EngineerName || s['Engineer Name'] || '');
+            if (normalizedName && studyEngineer && (
+                studyEngineer === normalizedName ||
+                studyEngineer.includes(normalizedName) ||
+                normalizedName.includes(studyEngineer)
+            )) {
+                return true;
+            }
+            return false;
+        });
         
         return { 
             success: true, 
-            data: list.map((s: any) => ({
+            data: filtered.map((s: any) => ({
                 id: s.Id,
                 clientCount: s.client_id, 
                 clientName: s.client_name || s.ClientName || s['Client Name'] || 'Desconocido',
