@@ -15,11 +15,17 @@ export default async function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gray-50 bg-[url('/grid.svg')]">
       <div className="z-10 w-full max-w-5xl flex flex-col items-center justify-between font-sans">
         
-        <div className="mb-12 text-center">
-             <h1 className="text-5xl font-extrabold bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent mb-4">
-              Estudios Técnicos
-            </h1>
-            <p className="text-gray-500 text-lg">Sistema de Gestión de Levantamientos y Reportes</p>
+        <div className="mb-12 text-center flex flex-col items-center">
+             <div className="flex items-center justify-center gap-4 mb-4">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-white shadow-sm flex items-center justify-center border border-slate-200">
+                  <img src="/logo.png" alt="TAS HUB Logo" className="w-full h-full object-cover" />
+                </div>
+                <h1 className="text-5xl font-extrabold flex items-center">
+                  <span className="text-slate-900 tracking-tight">TAS</span>
+                  <span className="text-primary-tas">HUB</span>
+                </h1>
+            </div>
+            <p className="text-slate-500 text-lg font-medium">Portal Central Corporativo</p>
         </div>
 
         {!session ? (
