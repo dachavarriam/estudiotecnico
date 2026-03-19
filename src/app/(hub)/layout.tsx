@@ -11,7 +11,7 @@ export default function HubLayout({
       <Sidebar />
       <main className="flex-1 flex flex-col overflow-y-auto relative">
         <Header />
-        <div className="p-8 max-w-7xl mx-auto w-full flex-1">
+        <div className="p-8 w-full flex-1">
           {children}
         </div>
       </main>

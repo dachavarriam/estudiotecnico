@@ -17,14 +17,14 @@ export default function TasHubDashboard() {
         {/* Module 1: Estudio Tecnico */}
         <Link 
           href="/estudios" 
-          className="group bg-white dark:bg-white/5 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-orange-500 dark:hover:border-orange-500 transition-all hover:shadow-xl hover:-translate-y-1 block"
+          className="group bg-white dark:bg-white/5 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-primary-tas dark:hover:border-primary-tas transition-all hover:shadow-xl hover:-translate-y-1 block"
         >
-          <div className="w-16 h-16 rounded-xl bg-orange-500/10 flex items-center justify-center mb-6 group-hover:bg-orange-500 transition-colors">
-            <span className="material-symbols-outlined text-orange-600 group-hover:text-white text-3xl transition-colors">engineering</span>
+          <div className="w-16 h-16 rounded-xl bg-primary-tas/10 flex items-center justify-center mb-6 group-hover:bg-primary-tas transition-colors">
+            <span className="material-symbols-outlined text-primary-tas group-hover:text-white text-3xl transition-colors">engineering</span>
           </div>
           <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Estudio Técnico</h3>
           <p className="text-slate-500 dark:text-slate-400">Gestiona levantamientos de seguridad, tiempos de ejecución y revisión.</p>
-          <div className="mt-8 flex items-center text-orange-600 font-bold gap-2">
+          <div className="mt-8 flex items-center text-primary-tas font-bold gap-2">
             <span>Ir al Módulo</span>
             <span className="material-symbols-outlined text-sm group-hover:translate-x-2 transition-transform">arrow_forward</span>
           </div>
@@ -35,8 +35,8 @@ export default function TasHubDashboard() {
           href="/employees" 
           className="group bg-white dark:bg-white/5 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-primary-tas transition-all hover:shadow-xl hover:-translate-y-1 block"
         >
-          <div className="w-16 h-16 rounded-xl bg-primary-tas/10 flex items-center justify-center mb-6 group-hover:bg-primary-tas transition-colors">
-            <span className="material-symbols-outlined text-primary-tas group-hover:text-white text-3xl transition-colors">groups</span>
+          <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-6 group-hover:bg-primary-tas transition-colors">
+            <span className="material-symbols-outlined text-slate-600 dark:text-slate-400 group-hover:text-white text-3xl transition-colors">groups</span>
           </div>
           <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Directorio Empleados</h3>
           <p className="text-slate-500 dark:text-slate-400">Gestiona la información del personal corporativo, perfiles y logística.</p>
@@ -49,14 +49,14 @@ export default function TasHubDashboard() {
         {/* Module 3: Planificación */}
         <Link 
           href="/calendar" 
-          className="group bg-white dark:bg-white/5 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 transition-all hover:shadow-xl hover:-translate-y-1 block"
+          className="group bg-white dark:bg-white/5 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-primary-tas transition-all hover:shadow-xl hover:-translate-y-1 block"
         >
-          <div className="w-16 h-16 rounded-xl bg-blue-500/10 flex items-center justify-center mb-6 group-hover:bg-blue-600 transition-colors">
-            <span className="material-symbols-outlined text-blue-600 group-hover:text-white text-3xl transition-colors">calendar_month</span>
+          <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-6 group-hover:bg-primary-tas transition-colors">
+            <span className="material-symbols-outlined text-slate-600 dark:text-slate-400 group-hover:text-white text-3xl transition-colors">calendar_month</span>
           </div>
           <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Planificación y Tareas</h3>
           <p className="text-slate-500 dark:text-slate-400">Agendamiento de auditores, mantenimiento de reportes y cronogramas.</p>
-          <div className="mt-8 flex items-center text-blue-600 font-bold gap-2">
+          <div className="mt-8 flex items-center text-primary-tas font-bold gap-2">
             <span>Ir al Calendario</span>
             <span className="material-symbols-outlined text-sm group-hover:translate-x-2 transition-transform">arrow_forward</span>
           </div>

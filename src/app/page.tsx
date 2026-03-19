@@ -1,6 +1,5 @@
-import { getSession, getAllUsers } from '@/actions/user-actions';
-import { LoginButton } from '@/components/login-button';
-import { MockAuthToggle } from '@/components/mock-auth-toggle';
+import { getSession } from '@/actions/user-actions';
+import { LoginForm } from '@/components/login-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LogOut, LayoutDashboard } from 'lucide-react';
@@ -9,12 +8,8 @@ import { logout } from '@/actions/user-actions';
 
 export const dynamic = 'force-dynamic';
 
-const IS_MOCK_AUTH = process.env.MOCK_AUTH === 'true';
-
 export default async function Home() {
   const session = await getSession();
-  const usersRes = await getAllUsers();
-  const users = usersRes.success ? usersRes.data : [];
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gray-50 bg-[url('/grid.svg')]">
@@ -31,18 +26,13 @@ export default async function Home() {
             <div className="w-full max-w-sm">
                 <Card className="border-0 shadow-lg">
                     <CardHeader className="text-center pb-2">
-                        <CardTitle>Bienvenido</CardTitle>
+                        <CardTitle className="text-2xl font-black">Central de Acceso</CardTitle>
                         <CardDescription>
-                            {IS_MOCK_AUTH 
-                                ? 'Modo Desarrollo: Selecciona un usuario para continuar' 
-                                : 'Inicia sesión con tu cuenta de TASHonduras (Slack)'}
+                            Ingresa con tus credenciales corporativas
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {IS_MOCK_AUTH 
-                            ? <MockAuthToggle users={users} />
-                            : <LoginButton />
-                        }
+                        <LoginForm />
                     </CardContent>
                 </Card>
             </div>

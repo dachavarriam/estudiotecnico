@@ -3,7 +3,7 @@
 import { nocodb } from '@/lib/nocodb';
 import { NOCODB_TABLES } from '@/lib/constants';
 
-const IS_MOCK_AUTH = process.env.MOCK_AUTH === 'true';
+const IS_MOCK_AUTH = false;
 
 // Hardcoded fallback for demo/testing stability
 const DEMO_USERS = [
@@ -69,83 +69,28 @@ export async function getAllUsers() {
 
 
 // ============================================================
-// AUTH: Dual-mode (NextAuth Slack OR Cookie Mock)
-// Controlled by MOCK_AUTH env variable
+// Real Auth (NextAuth Credentials)
 // ============================================================
 
-import { cookies } from 'next/headers';
-
-// --- Mock Auth (Cookie-based, for development) ---
-
-async function mockLogin(userId: string, role: string, name: string) {
-    const cookieStore = await cookies();
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    
-    cookieStore.set('session_userid', userId, { expires });
-    cookieStore.set('session_role', role, { expires });
-    cookieStore.set('session_username', name, { expires });
-    
+export async function login(userId: string, role: string, name: string) {
+    // Only used conceptually now - handled strictly by NextAuth client flow
     return { success: true };
 }
 
-async function mockLogout() {
-    const cookieStore = await cookies();
-    cookieStore.delete('session_userid');
-    cookieStore.delete('session_role');
-    cookieStore.delete('session_username');
-    return { success: true };
-}
-
-async function mockGetSession() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get('session_userid')?.value;
-    const role = cookieStore.get('session_role')?.value;
-    const name = cookieStore.get('session_username')?.value;
-    
-    if (!userId) return null;
-    return { userId, role, name };
-}
-
-// --- Real Auth (NextAuth + Slack) ---
-
-async function realLogout() {
+export async function logout() {
     const { signOut } = await import("@/auth");
     await signOut({ redirectTo: "/" });
     return { success: true };
 }
 
-async function realGetSession() {
+export async function getSession() {
     const { auth } = await import("@/auth");
     const session = await auth();
     if (!session?.user) return null;
     
     return { 
-        userId: (session.user as any).slack_id, 
-        role: (session.user as any).role, 
+        userId: (session.user as any).id, 
+        role: ((session.user as any).role || "").toLowerCase(), 
         name: session.user.name 
     };
-}
-
-// --- Exports (route to the correct implementation) ---
-
-export async function login(userId: string, role: string, name: string) {
-    if (IS_MOCK_AUTH) {
-        return mockLogin(userId, role, name);
-    }
-    // Real login is handled by NextAuth signIn() in the UI (LoginButton component)
-    return { success: true };
-}
-
-export async function logout() {
-    if (IS_MOCK_AUTH) {
-        return mockLogout();
-    }
-    return realLogout();
-}
-
-export async function getSession() {
-    if (IS_MOCK_AUTH) {
-        return mockGetSession();
-    }
-    return realGetSession();
 }
