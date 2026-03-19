@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased] - TAS Hub Unification
+### Added 
+- **Plan de Migración:** Estrategia para absorber módulos estáticos (Calendario, Empleados, Superadmin) dentro de la aplicación Next.js ("Estudio Técnico").
+- Nuevo `USER_MANUAL.md` para reflejar la visión del proyecto unificado.
+
+### Planned
+- **Fase 1:** Base Layout (Sidebar universal).
+- **Fase 2:** Autenticación unificada.
+- **Fase 3:** Directorio de empleados.
+- **Fase 4 & 5:** Calendario y Superadmin.
+
 ## [0.1.0] - 2026-02-17
 
 ### Added
