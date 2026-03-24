@@ -552,10 +552,10 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
             
             // Critical Backend Fix: Clear the physical file blobs from UI 
             // so they don't get appended and uploaded twice if the user saves again!
-            setImages(prev => prev.map(img => ({ ...img, file: undefined })));
+            setImages(prev => prev.map(img => ({ ...img, file: null })));
             setNotes(prev => prev.map(note => ({ ...note, file: undefined, isNew: false })));
-            setEngineerPlans(prev => prev.map(plan => ({ ...plan, file: undefined })));
-            setDirectorFiles(prev => prev.map(f => ({ ...f, file: undefined })));
+            setEngineerPlans((prev: any[]) => prev.map((plan: any) => ({ ...plan, file: undefined })));
+            setDirectorFiles((prev: any[]) => prev.map((f: any) => ({ ...f, file: undefined })));
             
             // Discard draft immediately since NocoDB is now the master record
             localStorage.removeItem(`tas_study_draft_${id}`);
