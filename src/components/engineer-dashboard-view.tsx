@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { MapPin, Clock, CheckCircle, AlertCircle, ArrowRight, Play, LogOut, Search } from 'lucide-react';
+import { MapPin, Clock, CheckCircle, AlertCircle, ArrowRight, Play, LogOut, Search, ArrowLeft } from 'lucide-react';
 import { logout } from '@/actions/user-actions';
 
 interface Study {
@@ -73,8 +73,15 @@ export function EngineerDashboardView({ studies, engineerName }: { studies: Stud
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Hola, {engineerName} 👋</h1>
-                        <p className="text-gray-500">Aquí tienes tus asignaciones para hoy.</p>
+                        <div className="flex items-center gap-3 mb-1">
+                            <Link href="/dashboard">
+                                <Button variant="outline" size="sm" className="h-8 text-gray-500 bg-white">
+                                    <ArrowLeft className="w-4 h-4 mr-1" /> Regresar al Panel Principal
+                                </Button>
+                            </Link>
+                        </div>
+                        <h1 className="text-2xl font-bold text-gray-900 mt-2">Hola, {engineerName} 👋</h1>
+                        <p className="text-gray-500 mt-1">Aquí tienes tus asignaciones para hoy.</p>
                     </div>
                     <Button variant="ghost" size="sm" onClick={handleLogout} className="text-red-500 hover:text-red-700 hover:bg-red-50 self-end md:self-auto">
                         <LogOut className="w-4 h-4 mr-2" /> Salir
@@ -137,7 +144,7 @@ export function EngineerDashboardView({ studies, engineerName }: { studies: Stud
                                             <MapPin className="w-3 h-3" /> {study.location || 'Sin ubicación'}
                                         </p>
                                     </div>
-                                    <Link href={`/engineer/study/${study.id}`} className="w-full md:w-auto">
+                                    <Link href={`/estudios/engineer/study/${study.id}`} className="w-full md:w-auto">
                                         <Button className="bg-blue-600 hover:bg-blue-700 w-full md:w-auto">
                                             Continuar <ArrowRight className="w-4 h-4 ml-1" />
                                         </Button>
@@ -190,7 +197,7 @@ export function EngineerDashboardView({ studies, engineerName }: { studies: Stud
                                                 <MapPin className="w-3 h-3" /> {study.location || 'Sin ubicación'}
                                             </p>
                                         </div>
-                                        <Link href={`/engineer/study/${study.id}`} className="w-full md:w-auto">
+                                        <Link href={`/estudios/engineer/study/${study.id}`} className="w-full md:w-auto">
                                             <Button variant="outline" className="border-blue-200 text-blue-600 hover:bg-blue-50 w-full md:w-auto">
                                                 <Play className="w-4 h-4 mr-2" /> Iniciar
                                             </Button>
@@ -229,7 +236,7 @@ export function EngineerDashboardView({ studies, engineerName }: { studies: Stud
                                                         {study.status === 'review' ? 'En Revisión' : 
                                                          study.status === 'approved' ? 'Aprobado' : 'Rechazado'}
                                                      </Badge>
-                                                     <Link href={`/engineer/study/${study.id}`}>
+                                                     <Link href={`/estudios/engineer/study/${study.id}`}>
                                                         <Button size="sm" variant="ghost">Ver</Button>
                                                      </Link>
                                                 </div>

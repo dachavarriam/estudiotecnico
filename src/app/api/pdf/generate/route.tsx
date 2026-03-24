@@ -21,6 +21,7 @@ const schema = z.object({
     url: z.string(),
     tag: z.string()
   })).optional(),
+  notes: z.array(z.string()).optional(),
   location: z.string().optional(),
   contact_info: z.string().optional(),
   categories: z.array(z.string()).optional(),

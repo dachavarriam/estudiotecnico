@@ -91,6 +91,67 @@ export async function getSession() {
     return { 
         userId: (session.user as any).id, 
         role: ((session.user as any).role || "").toLowerCase(), 
-        name: session.user.name 
+        name: session.user.name,
+        email: session.user.email
     };
+}
+
+export async function registerNewUser(formData: FormData) {
+    const name = formData.get('name') as string;
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    if (!name || !email || !password) {
+        return { success: false, error: 'Todos los campos son obligatorios' };
+    }
+
+    try {
+        const crypto = await import('crypto');
+        const tableId = "mt65n65nxm5n718";
+        const projectId = process.env.NOCODB_TASHUB_PROJECT_ID || "p9wu4sik6ofg8ze";
+        const baseUrl = process.env.NOCODB_URL;
+        const apiToken = process.env.NOCODB_API_TOKEN as string;
+
+        // 1. Check if email already exists
+        const checkUrl = `${baseUrl}/api/v1/db/data/noco/${projectId}/${tableId}?where=(email,eq,${encodeURIComponent(email)})&limit=1`;
+        const checkRes = await fetch(checkUrl, {
+            headers: { 'xc-token': apiToken, 'Content-Type': 'application/json' }
+        });
+        
+        if (checkRes.ok) {
+            const result = await checkRes.json();
+            if (result.list && result.list.length > 0) {
+                return { success: false, error: 'El correo ya está registrado' };
+            }
+        }
+
+        // 2. Hash Password
+        const inputHash = crypto.createHash('sha256').update(password).digest('hex');
+
+        // 3. Create User in NocoDB
+        const insertUrl = `${baseUrl}/api/v1/db/data/noco/${projectId}/${tableId}`;
+        const payload = {
+            name: name,
+            email: email,
+            password_hash: inputHash,
+            role_global: 'User', // Default role for safety
+            status: 'Activo'
+        };
+
+        const insertRes = await fetch(insertUrl, {
+            method: 'POST',
+            headers: { 'xc-token': apiToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!insertRes.ok) {
+            console.error("Failed to insert user", await insertRes.text());
+            return { success: false, error: 'Error del servidor al registrar usuario' };
+        }
+
+        return { success: true };
+    } catch (e: any) {
+        console.error("Registration Error", e);
+        return { success: false, error: 'Error inesperado registrando usuario' };
+    }
 }

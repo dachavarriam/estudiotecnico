@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server'
 // Protects internal dashboard routes from unauthorized access
 // ============================================================
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
     const { pathname } = req.nextUrl;
 
     // NextAuth session cookie (unsigned, just check presence)

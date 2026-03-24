@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Textarea } from '@/components/ui/textarea';
 import { AudioRecorder } from '@/components/audio-recorder';
 import { transcribeAudio, extractDataFromText } from '@/actions/voice-actions';
-import { Loader2, CheckCircle, Save, Plus, Trash2, Mic, FileText, Image as ImageIcon, Upload, ArrowLeft } from 'lucide-react';
+import { Loader2, CheckCircle, Save, Plus, Trash2, Mic, FileText, Image as ImageIcon, Upload, ArrowLeft, Download } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Bell, History, Check, ChevronsUpDown, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from 'next/navigation';
 import { StudyItemsTable } from '@/components/study-items-table';
@@ -53,7 +54,7 @@ interface SiteImage {
 
 // ... imports
 
-export function StudyView({ id, initialData, userRole, prevId, nextId, currentUser }: { id: string, initialData: any, userRole: string, prevId?: string, nextId?: string, currentUser?: any }) {
+export function StudyView({ id, initialData, userRole, prevId, nextId, currentUser, isCollaborator = false }: { id: string, initialData: any, userRole: string, prevId?: string, nextId?: string, currentUser?: any, isCollaborator?: boolean }) {
   // const { id } = use(params); // No longer needed
   
   // isEditMode and readOnly logic moved below status declaration
@@ -135,19 +136,18 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
   const [actions, setActions] = useState<string[]>(initialData.actions || []);
   const [comments, setComments] = useState<string[]>(initialData.comments || []);
   
-  const [status, setStatus] = useState(initialData.status || 'draft');
+  const initialStatus = initialData.status || initialData.Status || 'draft';
+  const [status, setStatus] = useState(initialStatus);
   
-  const canEngineerEdit = userRole === 'engineer' && (initialData.status === 'draft' || initialData.status === 'in_progress');
-  const [isEditMode, setIsEditMode] = useState<boolean>(canEngineerEdit);
+  // Permissions Logic
+  // Only explicitly assigned engineers OR active followers can edit, AND only when the study is in progress
+  const canEditState = isCollaborator && initialStatus === 'in_progress';
+  const [isEditMode, setIsEditMode] = useState<boolean>(canEditState);
   const effectiveReadOnly = !isEditMode;
   
   useEffect(() => {
-     if (userRole === 'engineer') {
-         setIsEditMode(status === 'draft' || status === 'in_progress');
-     } else if (userRole === 'director') {
-         setIsEditMode(false);
-     }
-  }, [status, userRole]);
+     setIsEditMode(isCollaborator && status === 'in_progress');
+  }, [status, isCollaborator]);
   const [clientName, setClientName] = useState(initialData.client_name || initialData.ClientName || 'Cliente General');
   
   // New Fields (Phase 2)
@@ -228,6 +228,49 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
           setEngineerPlans(prev => [...prev, ...newPlans]);
       }
   };
+
+  // ----- AUTOSAVE & RECOVERY SYSTEM (Phase 2.7) -----
+  const [hasDraft, setHasDraft] = useState(false);
+
+  // 1. Initial Load Check
+  useEffect(() => {
+      // We only offer recovery if they are actively working (in_progress)
+      if (initialStatus === 'in_progress') {
+          const draft = localStorage.getItem(`tas_study_draft_${id}`);
+          if (draft) setHasDraft(true);
+      }
+  }, [id, initialStatus]);
+
+  // 2. Continuous Autosave
+  useEffect(() => {
+      if (status !== 'in_progress') return; // Only cache active sessions
+      if (hasDraft) return; // Prevent overwriting the draft before user decides to restore or discard
+      
+      const timer = setTimeout(() => {
+          const draftData = {
+              materials,
+              // Strip blobs from notes to fit local storage limits
+              notes: notes.map(n => ({ ...n, file: undefined })), 
+              actions,
+              comments,
+              clientName,
+              location,
+              contactInfo,
+              fieldNotes,
+              instructions,
+              selectedCategories,
+              visitDate,
+              visitType,
+              estimatedHours,
+              estimatedEngineers,
+              estimatedTechnicians,
+              scheduleType,
+              timestamp: Date.now()
+          };
+          localStorage.setItem(`tas_study_draft_${id}`, JSON.stringify(draftData));
+      }, 2000); // 2-second debounce
+      return () => clearTimeout(timer);
+  }, [materials, notes, actions, comments, clientName, location, contactInfo, fieldNotes, instructions, selectedCategories, visitDate, visitType, estimatedHours, estimatedEngineers, estimatedTechnicians, scheduleType, status, id, hasDraft]);
 
   const directorFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -506,8 +549,19 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
         
         if (res.success) {
             setStatus('review'); // Optimistic UI update
-            alert('Estudio guardado y enviado para revisión exitosamente!');
-            // router.push('/engineer/dashboard'); // Redirect or stay
+            
+            // Critical Backend Fix: Clear the physical file blobs from UI 
+            // so they don't get appended and uploaded twice if the user saves again!
+            setImages(prev => prev.map(img => ({ ...img, file: undefined })));
+            setNotes(prev => prev.map(note => ({ ...note, file: undefined, isNew: false })));
+            setEngineerPlans(prev => prev.map(plan => ({ ...plan, file: undefined })));
+            setDirectorFiles(prev => prev.map(f => ({ ...f, file: undefined })));
+            
+            // Discard draft immediately since NocoDB is now the master record
+            localStorage.removeItem(`tas_study_draft_${id}`);
+            
+            alert('Estudio guardado exitosamente.');
+            // router.push('/estudios/engineer'); // Optional redirect
         } else {
             alert('Error guardando: ' + res.error);
         }
@@ -518,6 +572,27 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
     } finally {
         setIsProcessing(false);
     }
+  };
+
+  const handleDownloadCSV = () => {
+      const headers = ['Item', 'Descripción', 'Cantidad', 'Unidad', 'Categoría', 'Precio'];
+      const rows = (materials || []).map((m: any) => [
+          `"${(m.item || '').replace(/"/g, '""')}"`,
+          `"${(m.description || '').replace(/"/g, '""')}"`,
+          m.quantity,
+          m.unit,
+          m.category,
+          m.price
+      ]);
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r: any[]) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `estudio_${id}_materiales.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
   };
 
   const handleDownloadPDF = async () => {
@@ -534,6 +609,7 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
         materials,
         actions,
         comments: [], // Do not send audio-extracted comments to PDF as requested
+        notes: notes.filter((n: any) => n.transcription).map((n: any) => n.transcription),
         location,
         contact_info: combinedContact,
         categories: selectedCategories,
@@ -600,12 +676,56 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
   return (
 
     <div className="w-full px-6 py-4 pb-20 bg-slate-50 min-h-screen">
+      
+      {/* Recovery Banner */}
+      {hasDraft && (
+          <div className="mb-6 bg-orange-100 border border-orange-300 text-orange-800 px-4 py-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between shadow-sm">
+             <div className="mb-2 sm:mb-0">
+               <p className="font-bold text-sm">Hay cambios sin guardar</p>
+               <p className="text-xs">Se detectaron avances previos que no se subieron al servidor. ¿Deseas recuperarlos?</p>
+             </div>
+             <div className="flex gap-2">
+               <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white" onClick={() => {
+                   const draft = localStorage.getItem(`tas_study_draft_${id}`);
+                   if(draft) {
+                       try {
+                           const data = JSON.parse(draft);
+                           if(data.materials) setMaterials(data.materials);
+                           if(data.notes) setNotes(data.notes);
+                           if(data.actions) setActions(data.actions);
+                           if(data.comments) setComments(data.comments);
+                           if(data.clientName) setClientName(data.clientName);
+                           if(data.location) setLocation(data.location);
+                           if(data.contactInfo) setContactInfo(data.contactInfo);
+                           if(data.fieldNotes) setFieldNotes(data.fieldNotes);
+                           if(data.instructions) setInstructions(data.instructions);
+                           if(data.selectedCategories) setSelectedCategories(data.selectedCategories);
+                           if(data.visitDate) setVisitDate(data.visitDate);
+                           if(data.visitType) setVisitType(data.visitType);
+                           if(data.estimatedHours) setEstimatedHours(data.estimatedHours);
+                           if(data.estimatedEngineers) setEstimatedEngineers(data.estimatedEngineers);
+                           if(data.estimatedTechnicians) setEstimatedTechnicians(data.estimatedTechnicians);
+                           if(data.scheduleType) setScheduleType(data.scheduleType);
+                           setHasDraft(false);
+                       } catch(e) { console.error("Error restoring draft:", e); }
+                   }
+               }}>Recuperar Textos</Button>
+               <Button size="sm" variant="outline" className="border-orange-300 text-orange-800 hover:bg-orange-200 bg-white/50" onClick={() => {
+                   if(confirm('¿Eliminar copia local? Los datos perdidos no se podrán recuperar.')) {
+                       localStorage.removeItem(`tas_study_draft_${id}`);
+                       setHasDraft(false);
+                   }
+               }}>Descartar</Button>
+             </div>
+          </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <div>
             <div className="flex items-center gap-3">
                 <div className="flex bg-white rounded-md border shadow-sm mr-2">
-                    <Link href={userRole === 'director' ? '/dashboard' : '/engineer/dashboard'}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 border-r rounded-none hover:bg-gray-50" title="Volver al Dashboard">
+                    <Link href="/estudios">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 border-r rounded-none hover:bg-gray-50" title="Volver al Dashboard ET">
                             <ArrowLeft className="w-4 h-4" />
                         </Button>
                     </Link>
@@ -619,8 +739,30 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
             <p className="text-gray-800 ml-[104px] mt-1"><span className="font-bold">Cliente:</span> {clientName}</p>
         </div>
         <div className="flex gap-2 items-center">
+             
+             <DropdownMenu>
+                 <DropdownMenuTrigger asChild>
+                     <Button variant="outline" size="sm" className="hidden md:flex ml-2">
+                         <Download className="w-4 h-4 mr-2" /> Exportar
+                     </Button>
+                 </DropdownMenuTrigger>
+                 <DropdownMenuContent align="end" className="w-48">
+                     <DropdownMenuLabel>Opciones de Exportación</DropdownMenuLabel>
+                     <DropdownMenuSeparator />
+                     <DropdownMenuItem onClick={handleDownloadPDF} disabled={isProcessing}>
+                         PDF
+                     </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => window.print()}>
+                         Imprimir
+                     </DropdownMenuItem>
+                     <DropdownMenuItem onClick={handleDownloadCSV}>
+                         CSV
+                     </DropdownMenuItem>
+                 </DropdownMenuContent>
+             </DropdownMenu>
+
              {/* Versions & Follow Actions */}
-             <div className="flex gap-1 mr-2 border-r pr-3">
+             <div className="flex gap-1 ml-2 border-l pl-3">
                  <Button 
                     variant="ghost" 
                     size="sm" 
@@ -733,7 +875,7 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
                  </>
              )}
 
-             {!effectiveReadOnly && status === 'draft' && userRole === 'engineer' && (
+             {isCollaborator && status === 'draft' && (
                 <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={async () => {
                     if(!confirm('¿Iniciar levantamiento en sitio? Esto marcará la hora de inicio y habilitará el envío.')) return;
                     setIsProcessing(true);
@@ -743,46 +885,22 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
                         if(res.success) { 
                             setStatus('in_progress'); 
                             alert('Iniciado correctamente. Ahora puedes editar y enviar el estudio.'); 
+                        } else {
+                            alert('Error al iniciar: ' + res.error);
                         }
                     } catch(e) { alert('Error al iniciar'); }
                     setIsProcessing(false);
                 }}>
-                    <CheckCircle className="w-4 h-4 mr-2" /> Iniciar Levantamiento
+                    <CheckCircle className="w-4 h-4 mr-2" /> Iniciar Estudio Tecnico
                 </Button>
              )}
              
-             {!effectiveReadOnly && <Button size="sm" variant="ghost" className="text-blue-600" onClick={loadDemoData}>Demo</Button>}
-             
-             <Button size="sm" variant="outline" onClick={() => {
-                const headers = ['Item', 'Descripción', 'Cantidad', 'Unidad', 'Categoría', 'Precio'];
-                const rows = (materials || []).map((m: any) => [
-                    `"${(m.item || '').replace(/"/g, '""')}"`,
-                    `"${(m.description || '').replace(/"/g, '""')}"`,
-                    m.quantity,
-                    m.unit,
-                    m.category,
-                    m.price
-                ]);
-                const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r: any[]) => r.join(','))].join('\n');
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', `estudio_${id}_materiales.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-             }}>
-                <FileText className="w-4 h-4 mr-2" /> Excel/CSV
-             </Button>
-
-
-             <Button size="sm" variant="outline" onClick={handleDownloadPDF} disabled={isProcessing}><FileText className="w-4 h-4 mr-2" /> PDF / Imprimir</Button>
+             {/* Removed redundant Export / Demo buttons */}
              
              {/* Navigation */}
              <div className="flex bg-white rounded-md border shadow-sm ml-2">
                  {prevId ? (
-                    <Link href={`/engineer/study/${prevId}`}>
+                    <Link href={`/estudios/engineer/study/${prevId}`}>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 border-r rounded-none hover:bg-gray-50" title="Estudio Anterior">
                             <span className="text-xs font-bold">←</span>
                         </Button>
@@ -793,7 +911,7 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
                     </Button>
                  )}
                  {nextId ? (
-                    <Link href={`/engineer/study/${nextId}`}>
+                    <Link href={`/estudios/engineer/study/${nextId}`}>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 rounded-none hover:bg-gray-50" title="Siguiente Estudio">
                             <span className="text-xs font-bold">→</span>
                         </Button>
@@ -805,7 +923,7 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
                  )}
              </div>
 
-             {!effectiveReadOnly && status === 'in_progress' && userRole === 'engineer' && (
+             {!effectiveReadOnly && status === 'in_progress' && (
                  <Button size="sm" onClick={handleSaveStudy}>
                     <Save className="w-4 h-4 mr-2" /> Guardar y Enviar a Revisión
                  </Button>
@@ -859,7 +977,7 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
                             <Input value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} placeholder="Nombre y Teléfono" disabled={effectiveReadOnly} />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase text-gray-500">Categorías (Múltiple Selección)</label>
+                        <label className="text-xs font-bold uppercase text-gray-500">Categorías</label>
                         <Popover open={openCategoryDropdown} onOpenChange={setOpenCategoryDropdown}>
                             <PopoverTrigger asChild>
                                 <Button
@@ -931,7 +1049,7 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase text-gray-500">Notas de Campo / Observaciones</label>
+                        <label className="text-xs font-bold uppercase text-gray-500">Notas / Observaciones</label>
                         <Textarea 
                             value={fieldNotes} 
                             onChange={(e) => setFieldNotes(e.target.value)} 

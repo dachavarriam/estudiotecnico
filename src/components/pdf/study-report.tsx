@@ -223,6 +223,7 @@ interface StudyData {
     actions: string[];
     comments: string[];
     images?: { url: string; tag: string }[];
+    notes?: string[];
     location?: string;
     contact_info?: string;
     categories?: string[];
@@ -239,7 +240,7 @@ interface StudyData {
 
 const Footer = ({ id }: { id: string }) => (
   <View style={styles.footer} fixed>
-    <Text style={styles.footerText}>Generado por TAS Honduras - Sistema ET</Text>
+    <Text style={styles.footerText}>Generado por TAS HUB - Modulo ET</Text>
     <Text style={styles.footerText}>Ref: {id}</Text>
     <Text style={styles.footerText} render={({ pageNumber, totalPages }) => (
         `Página ${pageNumber} de ${totalPages}`
@@ -258,8 +259,8 @@ export const StudyReport = ({ data }: { data: StudyData }) => {
       {/* Header Banner */}
       <View style={styles.headerBanner}>
         <View style={styles.brandSection}>
-            <Text style={styles.companyName}>TAS HONDURAS</Text>
-            <Text style={styles.companySub}>Seguridad y Tecnología</Text>
+            <Text style={styles.companyName}>TAS SA DE CV</Text>
+            <Text style={styles.companySub}>Tecnología, Acceso y Seguridad</Text>
         </View>
         <View style={styles.reportMeta}>
             <Text style={styles.reportTitle}>ESTUDIO TÉCNICO</Text>
@@ -413,6 +414,21 @@ export const StudyReport = ({ data }: { data: StudyData }) => {
             </Text>
           </View>
       ) : null}
+
+      {/* Audio Transcriptions Annex */}
+      {data.notes && data.notes.length > 0 && (
+          <View style={[styles.section, { marginTop: 15 }]} wrap={false}>
+            <Text style={styles.sectionTitle}>Anexo: Transcripciones de Audio</Text>
+            <View style={styles.bulletList}>
+                {data.notes.map((note, i) => (
+                    <View key={i} style={styles.bulletItem}>
+                        <Text style={styles.bulletPoint}>•</Text>
+                        <Text style={[styles.bulletText, { fontStyle: 'italic', color: '#475569' }]}>"{note}"</Text>
+                    </View>
+                ))}
+            </View>
+          </View>
+      )}
 
       <Footer id={data.id} />
     </Page>

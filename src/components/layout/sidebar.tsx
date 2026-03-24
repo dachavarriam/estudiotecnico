@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { logout } from "@/actions/user-actions";
+import { FeedbackModal } from "@/components/feedback-modal";
 
 const navItems = [
   { name: "Panel Principal", icon: "dashboard", href: "/dashboard", role: "all" },
@@ -14,7 +16,7 @@ const navItems = [
   { name: "Superadmin", icon: "admin_panel_settings", href: "/superadmin", role: "superadmin" },
 ];
 
-export function Sidebar() {
+export function Sidebar({ user }: { user: any }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -43,7 +45,15 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto w-full p-4 space-y-1">
-        {navItems.map((item, index) => {
+        {navItems.filter(item => {
+            const userRole = user?.role?.toLowerCase() || 'user';
+            const isManager = ['admin', 'superadmin', 'director'].includes(userRole);
+            
+            if (item.type === "divider") return isManager;
+            if (item.role === 'all') return true;
+            if (item.role === 'superadmin' && !isManager) return false;
+            return true;
+        }).map((item, index) => {
           if (item.type === "divider") {
             return (
               <div key={index} className={cn("pt-4 mt-4 border-t border-slate-200 dark:border-slate-800", isCollapsed && "hidden")}>
@@ -77,24 +87,37 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 shrink-0 border-t border-slate-200 dark:border-slate-800">
-        <div className={cn("flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg", isCollapsed && "justify-center bg-transparent")}>
+        <FeedbackModal>
+            <button className={cn("flex w-full items-center gap-2 mb-4 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 dark:bg-slate-800 dark:hover:bg-red-900/20 px-3 py-2 rounded-lg font-medium transition-colors", isCollapsed && "justify-center px-0")} title="Reportar Fallas">
+                <span className="material-symbols-outlined text-sm">bug_report</span>
+                {!isCollapsed && <span>Reportar Fallas</span>}
+            </button>
+        </FeedbackModal>
+        <div className={cn("flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800", isCollapsed && "justify-center bg-transparent border-transparent")}>
           <div className="relative shrink-0">
-            <img 
-              alt="Avatar" 
-              className="w-8 h-8 rounded-full object-cover border border-slate-200" 
-              src="https://ui-avatars.com/api/?name=User+Demo&background= random" 
-            />
+            <span className="material-symbols-outlined text-slate-400 bg-white dark:bg-slate-700 p-1.5 rounded-full border border-slate-200 dark:border-slate-600">account_circle</span>
             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-slate-900"></div>
           </div>
-          {!isCollapsed && (
+          {!isCollapsed && user && (
             <div className="overflow-hidden">
-              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">Usuario Demo</p>
-              <p className="text-[10px] text-slate-500 truncate">Analista de Seguridad</p>
+              <p className="text-xs font-bold text-slate-900 dark:text-white truncate" title={user.name}>{user.name || "Usuario Desconocido"}</p>
+              <p className="text-[10px] text-slate-500 truncate" style={{ textTransform: 'capitalize' }}>{user.role || "Analista"}</p>
+            </div>
+          )}
+          {!isCollapsed && !user && (
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">Sesión Expirada</p>
             </div>
           )}
           {!isCollapsed && (
-            <button className="ml-auto text-slate-400 hover:text-primary-tas transition-colors" title="Cerrar Sesión">
-              <span className="material-symbols-outlined text-sm">logout</span>
+            <button 
+                onClick={async () => {
+                    await logout();
+                }}
+                className="ml-auto text-slate-400 hover:text-primary-tas transition-colors" 
+                title="Cerrar Sesión"
+            >
+                <span className="material-symbols-outlined text-sm">logout</span>
             </button>
           )}
         </div>

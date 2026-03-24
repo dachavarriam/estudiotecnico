@@ -23,6 +23,7 @@ import { ClientSelect } from "@/components/client-select"
 import { EmployeeSelect } from "@/components/employee-select"
 import { createTechnicalStudy } from "@/actions/study-actions"
 import { getEmployees } from "@/actions/odoo-actions"
+import { toast } from "sonner"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
@@ -125,7 +126,8 @@ export default function NewStudyForm() {
             clientName: finalClientName
         })
         if (result.success) {
-            router.push("/dashboard?success=true"); 
+            toast.success("Estudio Creado Exitosamente");
+            router.push("/estudios"); 
         } else {
             setSubmitStatus('error');
             setErrorMessage(result.error || "Error desconocido al crear el estudio.");
@@ -292,7 +294,7 @@ export default function NewStudyForm() {
           />
 
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
-            <Button type="button" variant="outline" className="w-full sm:w-1/2 order-2 sm:order-1" onClick={() => router.push('/dashboard')} disabled={submitStatus === 'loading'}>
+            <Button type="button" variant="outline" className="w-full sm:w-1/2 order-2 sm:order-1" onClick={() => router.push('/estudios')} disabled={submitStatus === 'loading'}>
               Cancelar
             </Button>
             <Button type="submit" disabled={submitStatus === 'loading'} className="w-full sm:w-1/2 order-1 sm:order-2">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export function Header() {
+export function Header({ user }: { user?: any }) {
   const [theme, setTheme] = useState("light");
 
   useEffect(() => {
@@ -50,14 +50,10 @@ export function Header() {
         
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold">Usuario Demo</p>
-            <p className="text-[11px] text-slate-500 uppercase tracking-tighter">u.demo@tas.com</p>
+            <p className="text-sm font-bold">{user?.name || "No Identificado"}</p>
+            <p className="text-[11px] text-slate-500 uppercase tracking-tighter" style={{ textTransform: 'lowercase' }}>{user?.email || "sin@correo.com"}</p>
           </div>
-          <img 
-            alt="User profile" 
-            className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700" 
-            src="https://ui-avatars.com/api/?name=User+Demo&background=random"
-          />
+          <span className="material-symbols-outlined text-slate-400 bg-white dark:bg-slate-800 p-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">account_circle</span>
         </div>
       </div>
     </header>

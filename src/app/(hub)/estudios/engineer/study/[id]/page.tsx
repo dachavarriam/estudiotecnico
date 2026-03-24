@@ -16,20 +16,16 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
   const studyData = result.success ? result.data : {};
 
   // Fetch List for Navigation (Simple optimized fetch could be added later)
-  const { getAllStudies } = await import('@/actions/study-actions');
+  const { getAllStudies, getEngineerStudies, checkIsFollowing } = await import('@/actions/study-actions');
   const allRes = await getAllStudies();
   const allStudies = allRes.success ? allRes.data : [];
   
   // Find current index
-  // Ensure ID comparison is safe (string vs number)
   const currentIndex = allStudies.findIndex((s: any) => String(s.id) === String(id));
   
   let prevId, nextId;
   if (currentIndex >= 0) {
-      // List is sorted Newest First (Index 0 is newest)
-      // "Previous" (Left Arrow) -> Newer Study (Index - 1)
       if (currentIndex > 0) prevId = allStudies[currentIndex - 1].id;
-      // "Next" (Right Arrow) -> Older Study (Index + 1)
       if (currentIndex < allStudies.length - 1) nextId = allStudies[currentIndex + 1].id;
   }
 
@@ -40,12 +36,23 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
   const currentUser = session ? {
       id: session.userId,
       name: session.name || 'Usuario',
+      email: session.email || '',
       role: session.role || mockRole
   } : {
       id: 'mock-user-id', 
       name: mockRole === 'director' ? 'Director Demo' : 'Irvin Jimenez',
+      email: '',
       role: mockRole
   };
+
+  // Explicitly check if the current user is the assigned engineer for this study
+  const myStudiesRes = await getEngineerStudies(currentUser.id, currentUser.name, currentUser.email);
+  const myStudies = myStudiesRes.success ? myStudiesRes.data : [];
+  const isAssignedToMe = myStudies.some((s: any) => String(s.id) === String(id));
+  
+  // Follower Check
+  const followRes = await checkIsFollowing(id, currentUser.id);
+  const isCollaborator = isAssignedToMe || !!followRes.isFollowing;
 
   return (
     <>
@@ -56,6 +63,7 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
             prevId={String(prevId)} 
             nextId={String(nextId)} 
             currentUser={currentUser}
+            isCollaborator={isCollaborator}
         />
     </>
   );

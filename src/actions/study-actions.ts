@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use server';
 
 // Mock users for now. In production, fetch from NocoDB or Slack.
@@ -149,34 +151,39 @@ export async function createTechnicalStudy(data: any) {
       // Phase 4 New Fields
       visit_date: data.visitDate ? new Date(data.visitDate).toISOString() : null,
       visit_type: data.visitType || 'Visita Técnica',
-      categories: data.categories && data.categories.length ? data.categories : ['Cableado Estructurado'],
+      categories: data.categories && data.categories.length ? data.categories.join(',') : 'Cableado Estructurado',
       // File attachments - handled if passed as array of attachment objects 
       // (which they should be if uploaded client-side or separate step)
       director_files: data.directorFiles || null,
-      // Link User if found
-      ...(engineerInternalId ? { users: engineerInternalId } : {})
+      
+      // Link User using exact physical foreign key column to bypass relation constraints
+      ...(engineerInternalId ? { users_id: engineerInternalId } : {})
     }) as any;
 
     const studyId = newStudy.Id;
 
     // Link Engineer if found (Skipping for now as we rely on text name mostly)
 
-    const { sendNotification, getStartStudyBlocks } = await import('@/lib/slack');
-    
-    // Use engineerId (Odoo ID) as slack ID? No. 
-    // We haven't implemented Odoo->Slack mapping fully yet.
-    // Assuming data.engineerId might be used for notification if it was a Slack ID.
-    // But create form sends Odoo ID.
-    // We'll skip notification or log warning if format doesn't match.
-    if (String(data.engineerId).startsWith('U')) {
-         const blocks = getStartStudyBlocks(studyId, data.clientName, data.engineerId);
-         await sendNotification(data.engineerId, `New Study Assigned: ${studyIdentifier}`, blocks as any);
+    try {
+        const { sendNotification, getStartStudyBlocks } = await import('@/lib/slack');
+        
+        // Use engineerId (Odoo ID) as slack ID? No. 
+        // We haven't implemented Odoo->Slack mapping fully yet.
+        // Assuming data.engineerId might be used for notification if it was a Slack ID.
+        // But create form sends Odoo ID.
+        // We'll skip notification or log warning if format doesn't match.
+        if (String(data.engineerId).startsWith('U')) {
+             const blocks = getStartStudyBlocks(studyId, data.clientName, data.engineerId);
+             await sendNotification(data.engineerId, `New Study Assigned: ${studyIdentifier}`, blocks as any);
+        }
+    } catch (slackError) {
+        console.error("Slack integration non-fatal error:", slackError);
     }
     
     return { success: true, id: studyId };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating study:', error);
-    return { success: false, error: 'Failed to create study' };
+    return { success: false, error: error.message || String(error) };
   }
 }
 
@@ -332,13 +339,18 @@ export async function getStudy(id: string) {
 
         if (!study) return { success: false, error: 'Study not found' };
 
-        // Fetch Related Data
+        // Fetch Related Data safely with fallback for column names
+        const safeFetch = (table: string, col1: string, col2: string): Promise<any> => 
+               nocodb.list(table, { where: `(${col1},eq,${id})`, limit: 200 })
+               .catch(() => nocodb.list(table, { where: `(${col2},eq,${id})`, limit: 200 }))
+               .catch((e: any) => { console.error(`Fallback failed for ${table}:`, e.message); return { list: [] }; });
+
         const [mRes, aRes, cRes, pRes, vRes] = await Promise.all([
-             nocodb.list(NOCODB_TABLES.study_materials, { where: `(technical_studies_id,eq,${id})`, limit: 200 }) as any,
-             nocodb.list(NOCODB_TABLES.study_actions, { where: `(technical_studies_id,eq,${id})`, limit: 100 }) as any,
-             nocodb.list(NOCODB_TABLES.study_comments, { where: `(technical_studies_id,eq,${id})`, limit: 100 }) as any,
-             nocodb.list(NOCODB_TABLES.study_photos, { where: `(technical_studies_id,eq,${id})`, limit: 100 }) as any,
-             nocodb.list(NOCODB_TABLES.voice_notes, { where: `(technical_studies_id,eq,${id})`, limit: 100 }) as any,
+             safeFetch(NOCODB_TABLES.study_materials, 'technical_studies_id', 'technical_studies'),
+             safeFetch(NOCODB_TABLES.study_actions, 'technical_studies_id', 'technical_studies'),
+             safeFetch(NOCODB_TABLES.study_comments, 'technical_studies_id', 'technical_studies'),
+             safeFetch(NOCODB_TABLES.study_photos, 'technical_studies_id', 'technical_studies'),
+             safeFetch(NOCODB_TABLES.voice_notes, 'technical_studies_id', 'technical_studies'),
         ]);
         
         const materialsList = mRes.list || mRes || [];
@@ -474,29 +486,36 @@ export async function getAllStudies() {
     }
 }
 
-export async function getEngineerStudies(engineerId: string) {
+export async function getEngineerStudies(engineerId: string, sessionName?: string, sessionEmail?: string) {
     try {
+        console.log("-> getEngineerStudies called params:", { engineerId, sessionName, sessionEmail });
+
         // Helper: strip accents and lowercase for comparison
         const normalize = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : '';
 
-        // 1. Resolve session ID to user record
-        const { getUserBySlackId } = await import('@/actions/user-actions');
-        const uRes = await getUserBySlackId(engineerId);
-        
-        let internalId: number | null = null;
-        let normalizedName = '';
+        // 1. Resolve true user record from Estudio_tecnico using sessionEmail
+        let internalIds: number[] = [];
+        let dbNormalizedNames: string[] = [];
 
-        if (uRes.success && uRes.data) {
-            internalId = uRes.data.Id;
-            normalizedName = normalize(uRes.data.Name || uRes.data.name || '');
-        } else {
-            // Fallback: use the engineerId itself as a name search
-            normalizedName = normalize(engineerId);
+        if (sessionEmail) {
+            try {
+                // Fetch ALL matching users, because some engineers have duplicate accounts with the same email in the DB!
+                const userRes = await nocodb.list(NOCODB_TABLES.users, {
+                    where: `(email,eq,${sessionEmail})`
+                }) as any;
+                const usersList = userRes.list || userRes || [];
+                if (usersList.length > 0) {
+                    internalIds = usersList.map((u: any) => u.Id);
+                    dbNormalizedNames = usersList.map((u: any) => normalize(u.Name || u.name || ''));
+                }
+            } catch (err) {
+                console.warn("Could not fetch real user ID from Estudio_tecnico using email:", err);
+            }
         }
 
+        const normalizedSessionName = normalize(sessionName || '');
+
         // 2. Fetch ALL studies and filter in-memory
-        // NocoDB's `like` is accent-sensitive, so "López" won't match "LOPEZ".
-        // With small datasets (<500), in-memory filtering is fast and reliable.
         const result = await nocodb.list(NOCODB_TABLES.technical_studies, {
              sort: '-CreatedAt',
              limit: 500
@@ -504,18 +523,53 @@ export async function getEngineerStudies(engineerId: string) {
 
         const allStudies = result.list || result || [];
 
-        // 3. Filter: match by linked user ID OR by normalized engineer name
+        // 3. Filter: match by true linked user ID OR by names
         const filtered = allStudies.filter((s: any) => {
-            // Match by linked user record
-            if (internalId && (s.users_id === internalId || s.users === internalId)) {
+            // Robust relational matcher for NocoDB nested objects/arrays
+            const checkId = (val: any, target: number) => {
+                if (!val) return false;
+                if (val == target) return true;
+                if (typeof val === 'object' && !Array.isArray(val) && val.Id == target) return true;
+                if (Array.isArray(val)) return val.some(v => v == target || (v && v.Id == target));
+                return false;
+            };
+
+            // Relational match by exact ID if we found the user(s)
+            if (internalIds.length > 0 && internalIds.some(id => checkId(s.users_id, id) || checkId(s.users, id))) {
                 return true;
             }
+            
+            // Extract display names from link columns (if they come as object or string)
+            let linkName = '';
+            if (s.users && typeof s.users === 'string') linkName = normalize(s.users);
+            else if (s.users && s.users.Name) linkName = normalize(s.users.Name);
+            else if (s.users && s.users.name) linkName = normalize(s.users.name);
+            
+            // Same for users_id if it's returning a lookup value
+            if (!linkName && s.users_id && typeof s.users_id === 'string') linkName = normalize(s.users_id);
+            else if (s.users_id && s.users_id.Name) linkName = normalize(s.users_id.Name);
+
+            if (normalizedSessionName && linkName && (
+                linkName === normalizedSessionName ||
+                linkName.includes(normalizedSessionName) ||
+                normalizedSessionName.includes(linkName)
+            )) {
+                return true;
+            }
+
             // Match by engineer_name text (accent & case insensitive)
             const studyEngineer = normalize(s.engineer_name || s.EngineerName || s['Engineer Name'] || '');
-            if (normalizedName && studyEngineer && (
-                studyEngineer === normalizedName ||
-                studyEngineer.includes(normalizedName) ||
-                normalizedName.includes(studyEngineer)
+            if (studyEngineer && normalizedSessionName && (
+                studyEngineer === normalizedSessionName ||
+                studyEngineer.includes(normalizedSessionName) ||
+                normalizedSessionName.includes(studyEngineer)
+            )) {
+                return true;
+            }
+            if (studyEngineer && dbNormalizedNames.length > 0 && dbNormalizedNames.some(dbn => 
+                studyEngineer === dbn ||
+                studyEngineer.includes(dbn) ||
+                dbn.includes(studyEngineer)
             )) {
                 return true;
             }

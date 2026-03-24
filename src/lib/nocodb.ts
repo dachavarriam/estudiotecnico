@@ -43,7 +43,7 @@ export class NocoDBClient {
       const errorBody = await res.text();
       // throw new Error(`NocoDB API Error: ${res.status} ${res.statusText} - ${errorBody}`);
       console.error(`NocoDB Error for ${url}: ${res.status} - ${errorBody}`);
-      throw new Error(`NocoDB API Error: ${res.status}`);
+      throw new Error(`NocoDB API Error: ${res.status} - ${errorBody}`);
     }
 
     return res.json();

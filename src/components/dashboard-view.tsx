@@ -217,14 +217,21 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
                     <p className="text-gray-500 mt-1">Analítica y seguimiento de reportes técnicos.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={handleLogout}>
-                        <LogOut className="w-4 h-4 mr-2" /> Salir
-                    </Button>
+                    <Link href="/dashboard">
+                        <Button variant="ghost" className="text-slate-500 hover:text-slate-900 hover:bg-slate-100">
+                            <span className="material-symbols-outlined text-sm mr-2">arrow_back</span> Regresar
+                        </Button>
+                    </Link>
                     <Button variant="outline" onClick={handleExportCSV}>
                         <FileText className="w-4 h-4 mr-2" /> Exportar CSV
                     </Button>
-                    <Link href="/director/new">
-                        <Button className="bg-blue-600 hover:bg-blue-700">
+                    <Link href="/estudios/engineer/dashboard">
+                        <Button variant="outline" className="border-blue-200 text-blue-600 hover:bg-blue-50 font-medium">
+                            Mis Asignaciones
+                        </Button>
+                    </Link>
+                    <Link href="/estudios/director/new">
+                        <Button className="bg-primary-tas hover:bg-primary-tas/90 text-white">
                             <Plus className="w-4 h-4 mr-2" /> Nuevo Estudio
                         </Button>
                     </Link>
@@ -232,7 +239,7 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
             </div>
 
             {/* FILTERS BAR */}
-            <Card className="bg-white border-blue-100 shadow-sm">
+            <Card className="bg-white border-primary-tas/20 shadow-sm">
                 <CardContent className="p-4 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                     <div className="space-y-2 md:col-span-1">
                         <label className="text-xs font-bold text-gray-500 uppercase">Cliente</label>
@@ -311,9 +318,9 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-blue-500">En Ejecución</CardTitle></CardHeader>
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase text-primary-tas">En Ejecución</CardTitle></CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold text-blue-600">{stats.inProgress}</div>
+                        <div className="text-3xl font-bold text-primary-tas">{stats.inProgress}</div>
                     </CardContent>
                 </Card>
                 <Card>
@@ -363,9 +370,9 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
                                             <span className="font-medium">{client}</span>
                                             <span className="text-gray-500">{count} estudios</span>
                                         </div>
-                                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                                             <div 
-                                                className="h-full bg-blue-500 rounded-full" 
+                                                className="h-full bg-primary-tas rounded-full shadow-sm" 
                                                 style={{ width: `${(count / (stats.volume || 1)) * 100}%` }}
                                             />
                                         </div>
@@ -427,8 +434,8 @@ export function DashboardView({ initialStudies }: { initialStudies: Study[] }) {
                                             {new Date(study.date).toLocaleDateString()}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Link href={`/engineer/study/${study.id}`}>
-                                                <Button size="sm" variant="outline" className="h-8">
+                                            <Link href={`/estudios/engineer/study/${study.id}`}>
+                                                <Button size="sm" variant="outline" className="h-8 hover:bg-primary-tas/5 hover:text-primary-tas hover:border-primary-tas/50 transition-colors">
                                                     <FileText className="w-3.5 h-3.5 mr-1" /> Ver
                                                 </Button>
                                             </Link>

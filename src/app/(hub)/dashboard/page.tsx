@@ -1,11 +1,16 @@
 import Link from 'next/link';
+import { auth } from '@/auth';
+import { FeedbackModal } from '@/components/feedback-modal';
 
-export default function TasHubDashboard() {
+export default async function TasHubDashboard() {
+  const session = await auth();
+  const userName = session?.user?.name || "Usuario";
+
   return (
     <div className="w-full">
       <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-          Bienvenido de nuevo, <span className="text-primary-tas">Usuario</span>
+          Bienvenido de nuevo, <span className="text-primary-tas">{userName}</span>
         </h2>
         <p className="text-slate-500 dark:text-slate-400 mt-2 flex items-center gap-2 font-medium">
           <span className="material-symbols-outlined text-sm">view_cozy</span>
@@ -70,11 +75,13 @@ export default function TasHubDashboard() {
           </div>
           <div className="flex-1">
             <h4 className="text-lg font-bold flex items-center gap-2">
-              TAS HUB Beta <span className="bg-primary-tas/20 text-primary-tas text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest">Activo</span>
+              TAS Hub Beta <span className="bg-primary-tas/20 text-primary-tas text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest">Activo</span>
             </h4>
             <p className="text-slate-600 dark:text-slate-400 text-sm mt-1">
-              El Sistema Central TAS Hub se encuentra en unificación. Las rutas de Estudio Técnico ya están integradas. 
-              Calendario y RRHH están en fase de migración.
+              TAS Hub está en fase Beta (desarrollo actual). Cualquier duda, comentario o mejora, por favor reportarlo{' '}
+              <FeedbackModal>
+                <button className="text-primary-tas font-bold hover:underline">aquí.</button>
+              </FeedbackModal>
             </p>
           </div>
         </div>

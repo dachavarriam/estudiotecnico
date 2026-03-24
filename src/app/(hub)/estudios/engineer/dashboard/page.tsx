@@ -9,15 +9,15 @@ export const dynamic = 'force-dynamic';
 export default async function EngineerDashboardPage() {
   const session = await getUserSession();
 
-  if (!session || session.role !== 'engineer') {
-      // If not logged in or not engineer, go home
-      redirect('/');
+  if (!session) {
+      // If not logged in, go home
+      redirect('/login');
   }
 
   const engineerId = session.userId;
   const engineerName = session.name || 'Ingeniero';
 
-  const result = await getEngineerStudies(engineerId);
+  const result = await getEngineerStudies(engineerId, session.name || undefined, session.email || undefined);
   const studies = result.success ? (result.data || []) : [];
 
   return (

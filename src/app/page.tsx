@@ -25,16 +25,16 @@ export default async function Home() {
                   <span className="text-primary-tas">HUB</span>
                 </h1>
             </div>
-            <p className="text-slate-500 text-lg font-medium">Portal Central Corporativo</p>
+            <p className="text-slate-500 text-lg font-medium">TAS SA DE CV | HONDURAS</p>
         </div>
 
         {!session ? (
             <div className="w-full max-w-sm">
                 <Card className="border-0 shadow-lg">
                     <CardHeader className="text-center pb-2">
-                        <CardTitle className="text-2xl font-black">Central de Acceso</CardTitle>
+                        <CardTitle className="text-2xl font-black">Acceso de Usuario</CardTitle>
                         <CardDescription>
-                            Ingresa con tus credenciales corporativas
+                            Ingresa con tus credenciales.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>

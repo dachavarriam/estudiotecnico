@@ -71,6 +71,12 @@ export function LoginForm() {
       <Button type="submit" disabled={loading} className="w-full h-12 bg-primary-tas hover:bg-black text-white font-bold text-lg mt-2 transition-all">
         {loading ? 'Validando...' : 'Iniciar Sesión'}
       </Button>
+
+      <div className="text-center mt-4">
+          <Button variant="link" type="button" onClick={() => router.push('/register')} className="text-sm text-primary-tas">
+              ¿No tienes cuenta? Solicita acceso aquí
+          </Button>
+      </div>
     </form>
   )
 }
