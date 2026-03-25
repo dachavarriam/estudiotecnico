@@ -19,6 +19,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const url = `${process.env.NOCODB_URL}/api/v1/db/data/noco/${projectId}/${tableId}?where=(email,eq,${encodeURIComponent(credentials.email as string)})&limit=1`;
           
           const res = await fetch(url, {
+            cache: 'no-store',
             headers: {
               'xc-token': process.env.NOCODB_API_TOKEN as string,
               'Content-Type': 'application/json'

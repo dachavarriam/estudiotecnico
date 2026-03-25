@@ -115,6 +115,7 @@ export async function registerNewUser(formData: FormData) {
         // 1. Check if email already exists
         const checkUrl = `${baseUrl}/api/v1/db/data/noco/${projectId}/${tableId}?where=(email,eq,${encodeURIComponent(email)})&limit=1`;
         const checkRes = await fetch(checkUrl, {
+            cache: 'no-store',
             headers: { 'xc-token': apiToken, 'Content-Type': 'application/json' }
         });
         
