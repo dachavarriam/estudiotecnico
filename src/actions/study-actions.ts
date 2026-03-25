@@ -322,9 +322,23 @@ export async function approveStudy(id: string) {
             "Status": 'approved',
             approved_at: new Date().toISOString()
         });
+        await addStudyActivity(id, '[SYSTEM] Estudio Aprobado por el Director.', 'log');
         return { success: true };
     } catch (error: any) {
         console.error("Error approving study:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function rejectStudy(id: string) {
+    try {
+        await nocodb.update(NOCODB_TABLES.technical_studies, id, {
+            "Status": 'in_progress'
+        });
+        await addStudyActivity(id, '[SYSTEM] Estudio devuelto para correcciones.', 'log');
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error rejecting study:", error);
         return { success: false, error: error.message };
     }
 }

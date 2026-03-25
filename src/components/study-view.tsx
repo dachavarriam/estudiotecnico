@@ -841,35 +841,35 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
              
              {isAdmin && status === 'review' && (
                  <>
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={async () => {
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled={isProcessing} onClick={async () => {
                         if(!confirm('¿Aprobar este estudio técnico?')) return;
                         setIsProcessing(true);
                         try {
-                            const { saveStudyDetails, addStudyActivity } = await import('@/actions/study-actions');
-                            await saveStudyDetails(id, { ...initialData, status: 'approved' }); // minimal save to trigger status
-                            // Actually wait, saveStudyDetails forces 'review'. Let's use nocodb directly here for simplicity, or just update the status logic.
-                            const { nocodb } = await import('@/lib/nocodb');
-                            const { NOCODB_TABLES } = await import('@/lib/constants');
-                            await nocodb.update(NOCODB_TABLES.technical_studies, id, { 'Status': 'approved', approved_at: new Date().toISOString() });
-                            await addStudyActivity(id, '[SYSTEM] Estudio Aprobado por el Director.', 'log');
-                            setStatus('approved');
-                            setIsEditMode(false);
-                        } catch(e) { alert('Error al aprobar'); }
+                            const { approveStudy } = await import('@/actions/study-actions');
+                            const res = await approveStudy(id);
+                            if (res.success) {
+                                setStatus('approved');
+                                setIsEditMode(false);
+                            } else {
+                                alert('Error al aprobar: ' + res.error);
+                            }
+                        } catch { alert('Error al aprobar'); }
                         setIsProcessing(false);
                     }}>
                         <CheckCircle className="w-4 h-4 mr-2" /> Aprobar
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={async () => {
+                    <Button size="sm" variant="destructive" disabled={isProcessing} onClick={async () => {
                         if(!confirm('¿Devolver este estudio al ingeniero?')) return;
                         setIsProcessing(true);
                         try {
-                            const { nocodb } = await import('@/lib/nocodb');
-                            const { NOCODB_TABLES } = await import('@/lib/constants');
-                            const { addStudyActivity } = await import('@/actions/study-actions');
-                            await nocodb.update(NOCODB_TABLES.technical_studies, id, { 'Status': 'in_progress' });
-                            await addStudyActivity(id, '[SYSTEM] Estudio devuelto para correcciones.', 'log');
-                            setStatus('in_progress');
-                        } catch(e) { alert('Error al devolver'); }
+                            const { rejectStudy } = await import('@/actions/study-actions');
+                            const res = await rejectStudy(id);
+                            if (res.success) {
+                                setStatus('in_progress');
+                            } else {
+                                alert('Error al devolver: ' + res.error);
+                            }
+                        } catch { alert('Error al devolver'); }
                         setIsProcessing(false);
                     }}>
                         Devolver
