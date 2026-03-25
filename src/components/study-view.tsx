@@ -140,6 +140,8 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
   const [status, setStatus] = useState(initialStatus);
   
   // Permissions Logic
+  const normalizedRole = String(userRole || '').toLowerCase();
+  const isAdmin = ['director', 'admin', 'superadmin', 'manager'].includes(normalizedRole);
   // Only explicitly assigned engineers OR active followers can edit, AND only when the study is in progress
   const canEditState = isCollaborator && initialStatus === 'in_progress';
   const [isEditMode, setIsEditMode] = useState<boolean>(canEditState);
@@ -825,19 +827,19 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
                 {STUDY_STATUS_MAP[status] || status || 'Borrador'}
             </span>
 
-             {userRole === 'director' && !isEditMode && status !== 'approved' && (
+             {isAdmin && !isEditMode && status !== 'approved' && (
                  <Button size="sm" variant="secondary" onClick={() => setIsEditMode(true)}>
                      Editar Estudio
                  </Button>
              )}
 
-             {userRole === 'director' && isEditMode && (
+             {isAdmin && isEditMode && (
                  <Button size="sm" onClick={handleSaveStudy} disabled={isProcessing}>
                      <Save className="w-4 h-4 mr-2" /> Guardar Cambios Previos
                  </Button>
              )}
              
-             {userRole === 'director' && status === 'review' && (
+             {isAdmin && status === 'review' && (
                  <>
                     <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={async () => {
                         if(!confirm('¿Aprobar este estudio técnico?')) return;
@@ -1149,7 +1151,7 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
                         </div>
 
                         {/* Director Labor Calculation Table */}
-                        {userRole === 'director' && (
+                        {isAdmin && (
                             <div>
                                 <h4 className="text-sm font-bold text-gray-600 mb-2 uppercase border-b pb-1">Cálculo de Costo de Mano de Obra</h4>
                                 <StudyItemsTable 
@@ -1252,7 +1254,7 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
                                  <p className="text-xs text-blue-500">{fileObj.file ? 'Pendiente de subida' : 'Guardado'}</p>
                              </div>
                          </div>
-                         {userRole === 'director' && (
+                         {isAdmin && (
                             <Button 
                                 variant="ghost" 
                                 size="sm" 
@@ -1268,7 +1270,7 @@ export function StudyView({ id, initialData, userRole, prevId, nextId, currentUs
                  {directorFiles.length === 0 && <p className="text-sm text-gray-400 italic">No hay archivos administrativos.</p>}
              </div>
 
-             {userRole === 'director' && (
+             {isAdmin && (
                 <div className="border-2 border-dashed border-blue-200 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 bg-white mt-4" onClick={() => directorFileInputRef.current?.click()}>
                     <Upload className="w-8 h-8 text-blue-400 mb-2" />
                     <p className="text-sm text-blue-600 font-medium">Subir Documento PDF / Referencia</p>
